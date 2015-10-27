@@ -1,3 +1,4 @@
+from line_profiler import LineProfiler
 from ctypes import (POINTER, c_char_p, c_uint, c_uint, c_uint, c_uint, c_uint, c_double, string_at)
 from falcon_kit.multiproc import Pool
 from falcon_kit import falcon
@@ -12,6 +13,20 @@ falcon.generate_consensus.argtypes = [ POINTER(c_char_p), c_uint, c_uint, c_uint
 falcon.generate_consensus.restype = POINTER(falcon_kit.ConsensusData)
 falcon.free_consensus_data.argtypes = [ POINTER(falcon_kit.ConsensusData) ]
 
+def do_profile(follow=[]):
+    def inner(func):
+        def profiled_func(*args, **kwargs):
+            try:
+                profiler = LineProfiler()
+                profiler.add_function(func)
+                for f in follow:
+                    profiler.add_function(f)
+                profiler.enable_by_count()
+                return func(*args, **kwargs)
+            finally:
+                profiler.print_stats()
+        return profiled_func
+    return inner
 
 def get_alignment(seq1, seq0, edge_tolerance = 1000):
 
@@ -161,6 +176,7 @@ def get_seq_data(config, min_cov_aln, min_len_aln):
 def format_seq(seq, col):
     return "\n".join( [ seq[i:(i+col)] for i in xrange(0, len(seq), col) ] )
 
+@do_profile(follow=[get_consensus_with_trim, get_consensus_without_trim, get_alignment, get_seq_data])
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser(description='a simple multi-processor consensus sequence generator')
     parser.add_argument('--n_core', type=int, default=24,
