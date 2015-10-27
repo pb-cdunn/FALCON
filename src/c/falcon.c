@@ -61,6 +61,24 @@
 #include <stdint.h>
 #include "common.h"
 
+/*
+#include <sys/types.h>
+#include <unistd.h>
+#include <gperftools/profiler.h>
+
+//static void init() __attribute__((constructor));
+static char fn[128];
+void init() {
+    snprintf(fn, 128, "foob.%d", getpid());
+    fprintf(stderr, "Hello: '%s'\n", fn);
+    ProfilerStart(fn);
+}
+static void fini() __attribute__((destructor));
+void fini() {
+    fprintf(stderr, "Bye %d '%s'\n", getpid(), fn);
+    ProfilerStop();
+}
+*/
 typedef struct {
     seq_coor_t t_pos;
     uint8_t delta;
@@ -556,8 +574,6 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
     return consensus;
 }
 
-//const unsigned int K = 8;
-
 consensus_data * generate_consensus( char ** input_seq, 
                            unsigned int n_seq, 
                            unsigned min_cov, 
@@ -665,6 +681,7 @@ consensus_data * generate_consensus( char ** input_seq,
         free_align_tags(tags_list[j]);
     }
     free(tags_list);
+    //ProfilerFlush();
     return consensus;
 }
 
