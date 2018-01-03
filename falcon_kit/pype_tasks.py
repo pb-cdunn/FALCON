@@ -96,6 +96,13 @@ def task_build_pdb(self):
     self.generated_script_fn = script_fn
 
 
+TASK_RUN_DB_TO_FALCON_SCRIPT = """\
+# Given preads.db,
+# write preads4falcon.fasta (implicitly) in CWD.
+time DB2Falcon -U {input.preads_db}
+[ -f {output.preads4falcon} ] || exit 1
+touch {output.job_done}
+"""
 def task_run_db2falcon(self):
     wd = self.parameters['wd']
     # self.las_fofn # TODO: Are there any implicit dependencies, or can we drop this?

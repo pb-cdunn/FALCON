@@ -456,34 +456,29 @@ def run(wf, config, rule_writer,
 
     # Draft assembly (called 'fc_' for now)
     wf.max_jobs = config['fc_concurrent_jobs']
-    db2falcon_dir = os.path.join(pread_dir, 'db2falcon')
-    db2falcon_done = makePypeLocalFile(
-        os.path.join(db2falcon_dir, 'db2falcon_done'))
-    preads4falcon_plf = makePypeLocalFile(
-        os.path.join(db2falcon_dir, 'preads4falcon.fasta'))
-    make_run_db2falcon = PypeTask(
-        inputs={'las_fofn_plf': las_fofn_plf,
-                'preads_db': preads_db,
-                },
-        outputs={'db2falcon_done': db2falcon_done,
-                 'preads4falcon': preads4falcon_plf,
-                 },
-        parameters={'wd': db2falcon_dir,
-                    'config': config,
-                    'sge_option': config['sge_option_fc'],
-                    },
-    )
-    wf.addTask(make_run_db2falcon(pype_tasks.task_run_db2falcon))
-
-    db2falcon_done_fn = fn(db2falcon_done)
-    preads4falcon_fn = fn(preads4falcon_plf)
     las_fofn_fn = fn(las_fofn_plf)
     preads_db_fn = fn(preads_db)
+    db2falcon_dir = os.path.join(pread_dir, 'db2falcon')
+    db2falcon_done_fn = os.path.join(db2falcon_dir, 'db2falcon_done')
+    preads4falcon_fn = os.path.join(db2falcon_dir, 'preads4falcon.fasta')
+    wf.addTask(gen_task(
+        script=pype_tasks.TASK_RUN_DB_TO_FALCON_SCRIPT,
+        inputs={'las_fofn': las_fofn_fn,
+                'preads_db': preads_db_fn,
+                },
+        outputs={'job_done': db2falcon_done_fn,
+                 'preads4falcon': preads4falcon_fn,
+                 },
+        parameters=parameters,
+        rule_writer=rule_writer,
+    ))
+
     falcon_asm_done_fn = os.path.join(falcon_asm_dir, 'falcon_asm_done')
     parameters = {
+        'sge_option': config['sge_option_fc'],
         'topdir': os.getcwd(),
     }
-    for key in ('sge_option', 'overlap_filtering_setting', 'length_cutoff_pr', 'fc_ovlp_to_graph_option'):
+    for key in ('overlap_filtering_setting', 'length_cutoff_pr', 'fc_ovlp_to_graph_option'):
         parameters[key] = config[key]
     wf.addTask(gen_task(
         script=pype_tasks.TASK_RUN_FALCON_ASM_SCRIPT,
