@@ -115,6 +115,41 @@ def task_run_db2falcon(self):
     support.run_db2falcon(**args)
     self.generated_script_fn = script_fn
 
+TASK_RUN_FALCON_ASM_SCRIPT = """\
+# Given, las.fofn,
+# write preads.ovl:
+
+# mobs uses binwrappers, so it does not see our "entry-points".
+# So, after dropping "src/py_scripts/*.py", we can call these via python -m:
+
+time python -m falcon_kit.mains.ovlp_filter --db {input.db_file} --fofn {input.las_fofn} {params.overlap_filtering_setting} --min_len {params.length_cutoff_pr} --out-fn preads.ovl
+
+ln -sf {input.preads4falcon_fasta} ./preads4falcon.fasta
+
+# Given preads.ovl,
+# write sg_edges_list, c_path, utg_data, ctg_paths.
+time python -m falcon_kit.mains.ovlp_to_graph {params.fc_ovlp_to_graph_option} --overlap-file preads.ovl >| fc_ovlp_to_graph.log
+
+# Given sg_edges_list, utg_data, ctg_paths, preads4falcon.fasta,
+# write p_ctg.fa and a_ctg_all.fa,
+# plus a_ctg_base.fa, p_ctg_tiling_path, a_ctg_tiling_path, a_ctg_base_tiling_path:
+time python -m falcon_kit.mains.graph_to_contig
+
+# Given a_ctg_all.fa, write a_ctg.fa:
+time python -m falcon_kit.mains.dedup_a_tigs
+
+# Generate a GFA of all assembly graph edges. This GFA can contain
+# edges and nodes which are not part of primary and associate contigs.
+time python -m falcon_kit.mains.gen_gfa_v1 >| asm.gfa
+
+# Generate a GFA of all assembly graph edges. This GFA can contain
+# edges and nodes which are not part of primary and associate contigs.
+time python -m falcon_kit.mains.gen_gfa_v1 --add-string-graph >| sg.gfa
+
+#rm -f ./preads4falcon.fasta
+
+touch {output.falcon_asm_done}
+"""
 
 def task_run_falcon_asm(self):
     wd = self.parameters['wd']

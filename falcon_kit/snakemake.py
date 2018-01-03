@@ -203,7 +203,8 @@ def snake_merge_multi_dynamic(output_fn, dict_of_input_fns, dict_of_patterns, wi
 """)
         prefix = """
 shell.prefix('''
-set -vx
+# Add -e vs. in falcon_unzip.
+set -vex
 hostname
 pwd
 ''')

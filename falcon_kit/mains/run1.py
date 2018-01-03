@@ -1,3 +1,4 @@
+from ..pype import (gen_task, gen_parallel_tasks) # copied verbatim from falcon_unzip
 from .. import run_support as support
 from .. import bash, pype_tasks, snakemake
 from ..util.system import (only_these_symlinks, lfs_setstripe_maybe)
@@ -474,24 +475,29 @@ def run(wf, config, rule_writer,
     )
     wf.addTask(make_run_db2falcon(pype_tasks.task_run_db2falcon))
 
-    falcon_asm_done = makePypeLocalFile(
-        os.path.join(falcon_asm_dir, 'falcon_asm_done'))
-    make_run_falcon_asm = PypeTask(
-        inputs={'db2falcon_done': db2falcon_done, 'db_file': preads_db,
-                'preads4falcon': preads4falcon_plf,
-                'las_fofn': las_fofn_plf,
+    db2falcon_done_fn = fn(db2falcon_done)
+    preads4falcon_fn = fn(preads4falcon_plf)
+    las_fofn_fn = fn(las_fofn_plf)
+    preads_db_fn = fn(preads_db)
+    falcon_asm_done_fn = os.path.join(falcon_asm_dir, 'falcon_asm_done')
+    parameters = {
+        'topdir': os.getcwd(),
+    }
+    for key in ('sge_option', 'overlap_filtering_setting', 'length_cutoff_pr', 'fc_ovlp_to_graph_option'):
+        parameters[key] = config[key]
+    wf.addTask(gen_task(
+        script=pype_tasks.TASK_RUN_FALCON_ASM_SCRIPT,
+        inputs={'db2falcon_done': db2falcon_done_fn, 'db_file': preads_db_fn,
+                'preads4falcon_fasta': preads4falcon_fn,
+                'las_fofn': las_fofn_fn,
                 },
-        outputs={'falcon_asm_done': falcon_asm_done},
-        parameters={'wd': falcon_asm_dir,
-                    'config': config,
-                    'pread_dir': pread_dir,
-                    'sge_option': config['sge_option_fc'],
-                    },
-    )
-    wf.addTask(make_run_falcon_asm(pype_tasks.task_run_falcon_asm))
+        outputs={'falcon_asm_done': falcon_asm_done_fn},
+        parameters=parameters,
+        rule_writer=rule_writer,
+    ))
     wf.refreshTargets()
 
-    return falcon_asm_done
+    #return falcon_asm_done
 
 
 def main(argv=sys.argv):
