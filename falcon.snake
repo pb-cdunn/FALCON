@@ -1,0 +1,211 @@
+
+import json
+import os
+#import snakemake.utils
+
+def snake_merge_dynamic_dict(reldir, input_fns, pattern, wildcards):
+        '''Assume each wildcard appears at most once in the pattern.
+        '''
+        for k in wildcards:
+            pattern = pattern.replace('{%s}' %k, '(?P<%s>\w+)' %k)
+        re_dynamic = re.compile(pattern)
+        mapped = list()
+        for fn in input_fns:
+            mo = re_dynamic.search(fn)
+            assert mo, '{!r} did not match {!r}'.format(fn, re_dynamic.pattern)
+            file_description = dict()
+            file_description['wildcards'] = dict(mo.groupdict())
+            file_description['fn'] = os.path.relpath(fn, reldir)
+            mapped.append(file_description)
+        return mapped
+
+def snake_merge_multi_dynamic(output_fn, dict_of_input_fns, dict_of_patterns, wildcards):
+        outdir = os.path.normpath(os.path.dirname(output_fn))
+        if not os.path.isdir(outdir):
+            os.makedirs(outdir)
+        assert list(sorted(dict_of_input_fns.keys())) == list(sorted(dict_of_patterns.keys()))
+        all_mapped = dict()
+        for i in dict_of_patterns.keys():
+            input_fns = dict_of_input_fns[i]
+            pattern = dict_of_patterns[i]
+            mapped = snake_merge_dynamic_dict(outdir, input_fns, pattern, wildcards)
+            all_mapped[i] = mapped
+        all_grouped = dict()
+        for i, mapped in all_mapped.items():
+            #print(i, mapped)
+            for file_description in mapped:
+                #print(file_description)
+                #print(file_description['wildcards'])
+                #print(list(sorted(file_description['wildcards'].items())))
+                wildkey = ','.join('{}={}'.format(k,v) for k,v in sorted(file_description['wildcards'].items()))
+                if wildkey not in all_grouped:
+                    new_group = dict(
+                        wildcards=dict(file_description['wildcards']),
+                        fns=dict(),
+                    )
+                    all_grouped[wildkey] = new_group
+                group = all_grouped[wildkey]
+                wildcards = file_description['wildcards']
+                assert wildcards == group['wildcards'], '{!r} should match {!r} by snakemake convention'.format(
+                    wildcards, group['wildcards'])
+                fn = file_description['fn']
+                group['fns'][i] = fn
+        ser = json.dumps(all_grouped, indent=2, separators=(',', ': ')) + '\n'
+        with open(output_fn, 'w') as out:
+            out.write(ser)
+
+shell.prefix('''
+# Add -e vs. in falcon_unzip.
+set -vex
+hostname
+pwd
+''')
+
+rule static_1_preads_ovl_merge_scatter:
+    input:  run_jobs='1-preads_ovl/run_jobs.sh', p_gathered_las='1-preads_ovl/gathered-las/gathered-las.txt'
+    output: scattered='1-preads_ovl/merge-scatter/scattered.json'
+    params:
+        db_prefix="preads",
+        nblock="1"
+    shell:
+        '''
+outdir=$(dirname {output[0]})
+#mkdir -p ${{outdir}}
+cd ${{outdir}}
+date
+
+python -m falcon_kit.mains.las_merge_scatter --db-prefix={params.db_prefix} --run-jobs-fn=../../{input.run_jobs} --p-gathered-las-fn=../../{input.p_gathered_las} --scattered-fn=../../{output.scattered}
+
+date
+'''
+
+rule dynamic_foo_split:
+    input:  '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/1-preads_ovl/merge-scatter/scattered.json'
+    output: las_paths=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/las_paths.json'), merged_las_json=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/merged_las.json'), merge_script=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/merge-script.sh')
+    shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} las_paths="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/las_paths.json" merged_las_json="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merged_las.json" merge_script="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merge-script.sh"'
+
+rule static___1_preads_ovl__job_pid_:
+    input:  las_paths='1-preads_ovl/merge-scripts/{job_id}.symlink/las_paths.json', merged_las_json='1-preads_ovl/merge-scripts/{job_id}.symlink/merged_las.json', merge_script='1-preads_ovl/merge-scripts/{job_id}.symlink/merge-script.sh'
+    output: job_done='1-preads_ovl/{job_pid}/merge.done', merged_las='1-preads_ovl/{job_pid}/merged.las'
+    params:
+        nblock="1",
+        job_id="{job_id}"
+    shell:
+        '''
+outdir=$(dirname {output[0]})
+#mkdir -p ${{outdir}}
+cd ${{outdir}}
+date
+
+# Note: HPC.daligner chooses a merged filename in its generated script, so we will symlink to it.
+python -m falcon_kit.mains.las_merge --las-paths-fn=../../{input.las_paths} --merge-script-fn=../../{input.merge_script} --las-merged-fn-fn=../../{input.merged_las_json} --las-merged-symlink-fn=../../{output.merged_las} --job-done-fn=../../{output.job_done}
+
+date
+'''
+
+rule dynamic_foo_merge:
+    input:  job_done=ancient(dynamic('1-preads_ovl/{job_pid}/merge.done')), merged_las=ancient(dynamic('1-preads_ovl/{job_pid}/merged.las'))
+    output: '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/1-preads_ovl/merge-gathered/gathered.json'
+    run:
+        snake_merge_multi_dynamic(output[0],
+            dict(
+              job_done=[str(i) for i in input.job_done],
+              merged_las=[str(i) for i in input.merged_las]
+            ),
+            dict(
+              job_done="1-preads_ovl/{job_pid}/merge.done",
+              merged_las="1-preads_ovl/{job_pid}/merged.las"
+            ),
+            ["job_pid"] # all wildcards
+        )
+
+rule static_1_preads_ovl_merged_las_fofn:
+    input:  gathered='1-preads_ovl/merge-gathered/gathered.json'
+    output: las_fopfn='1-preads_ovl/merged-las-fofn/las.fopfn', las_fofn='1-preads_ovl/merged-las-fofn/las.fofn'
+    params:
+        nblock="1"
+    shell:
+        '''
+outdir=$(dirname {output[0]})
+#mkdir -p ${{outdir}}
+cd ${{outdir}}
+date
+
+python -m falcon_kit.mains.las_merge_gather --gathered-fn=../../{input.gathered} --las-fofn-fn=../../{output.las_fofn} --las-fopfn-fn=../../{output.las_fopfn}
+
+date
+'''
+
+rule static_1_preads_ovl_db2falcon:
+    input:  preads_db='1-preads_ovl/preads.db', las_fofn='1-preads_ovl/merged-las-fofn/las.fofn'
+    output: job_done='1-preads_ovl/db2falcon/db2falcon_done', preads4falcon='1-preads_ovl/db2falcon/preads4falcon.fasta'
+    params:
+        nblock="1"
+    shell:
+        '''
+outdir=$(dirname {output[0]})
+#mkdir -p ${{outdir}}
+cd ${{outdir}}
+date
+
+# Given preads.db,
+# write preads4falcon.fasta (implicitly) in CWD.
+time DB2Falcon -U ../../{input.preads_db}
+[ -f ../../{output.preads4falcon} ] || exit 1
+touch ../../{output.job_done}
+
+date
+'''
+
+rule static_2_asm_falcon:
+    input:  db2falcon_done='1-preads_ovl/db2falcon/db2falcon_done', db_file='1-preads_ovl/preads.db', las_fofn='1-preads_ovl/merged-las-fofn/las.fofn', preads4falcon_fasta='1-preads_ovl/db2falcon/preads4falcon.fasta'
+    output: falcon_asm_done='2-asm-falcon/falcon_asm_done'
+    params:
+        topdir="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2",
+        length_cutoff_pr="1",
+        sge_option="-pe smp 24 -q bigmem",
+        overlap_filtering_setting="--max_diff 120 --max_cov 120 --min_cov 2 --n_core 12",
+        fc_ovlp_to_graph_option=" --min_len 1"
+    shell:
+        '''
+outdir=$(dirname {output[0]})
+#mkdir -p ${{outdir}}
+cd ${{outdir}}
+date
+
+# Given, las.fofn,
+# write preads.ovl:
+
+# mobs uses binwrappers, so it does not see our "entry-points".
+# So, after dropping "src/py_scripts/*.py", we can call these via python -m:
+
+time python -m falcon_kit.mains.ovlp_filter --db ../{input.db_file} --fofn ../{input.las_fofn} {params.overlap_filtering_setting} --min_len {params.length_cutoff_pr} --out-fn preads.ovl
+
+ln -sf ../{input.preads4falcon_fasta} ./preads4falcon.fasta
+
+# Given preads.ovl,
+# write sg_edges_list, c_path, utg_data, ctg_paths.
+time python -m falcon_kit.mains.ovlp_to_graph {params.fc_ovlp_to_graph_option} --overlap-file preads.ovl >| fc_ovlp_to_graph.log
+
+# Given sg_edges_list, utg_data, ctg_paths, preads4falcon.fasta,
+# write p_ctg.fa and a_ctg_all.fa,
+# plus a_ctg_base.fa, p_ctg_tiling_path, a_ctg_tiling_path, a_ctg_base_tiling_path:
+time python -m falcon_kit.mains.graph_to_contig
+
+# Given a_ctg_all.fa, write a_ctg.fa:
+time python -m falcon_kit.mains.dedup_a_tigs
+
+# Generate a GFA of all assembly graph edges. This GFA can contain
+# edges and nodes which are not part of primary and associate contigs.
+time python -m falcon_kit.mains.gen_gfa_v1 >| asm.gfa
+
+# Generate a GFA of all assembly graph edges. This GFA can contain
+# edges and nodes which are not part of primary and associate contigs.
+time python -m falcon_kit.mains.gen_gfa_v1 --add-string-graph >| sg.gfa
+
+#rm -f ./preads4falcon.fasta
+
+touch ../{output.falcon_asm_done}
+
+date
+'''

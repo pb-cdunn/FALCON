@@ -425,38 +425,60 @@ def run(wf, config, rule_writer,
     wf.refreshTargets(exitOnFailure=exitOnFailure)
 
     # Merge .las files.
-    wf.max_jobs = config['pla_concurrent_jobs']
-    config['sge_option_la'] = config['sge_option_pla']
+    #wf.max_jobs = config['pla_concurrent_jobs']
+    #config['sge_option_la'] = config['sge_option_pla']
     scattered_fn = os.path.join(pread_dir, 'merge-scatter', 'scattered.json')
-    make_task = PypeTask(
+    #task = make_task(pype_tasks.task_merge_scatter)
+    #wf.refreshTargets(exitOnFailure=exitOnFailure)
+    params = dict(parameters)
+    params['db_prefix'] = 'preads'
+    wf.addTask(gen_task(
+        script=pype_tasks.TASK_LAS_MERGE_SCATTER_SCRIPT,
         inputs={
-            'run_jobs': run_jobs,
-            'gathered_las': p_gathered_las_plf,
+            'run_jobs': fn(run_jobs),
+            'p_gathered_las': fn(p_gathered_las_plf),
         },
         outputs={
             'scattered': scattered_fn,
         },
-        parameters={
-            'db_prefix': 'preads',
-            'config': config,
-        },
+        parameters=params,
+        rule_writer=rule_writer,
+    ))
+
+    gathered_fn = os.path.join(pread_dir, 'merge-gathered', 'gathered.json')
+    gen_parallel_tasks(
+        wf, rule_writer,
+        scattered_fn, gathered_fn,
+        run_dict=dict(
+            script=pype_tasks.TASK_LAS_MERGE_SCRIPT,
+            inputs={
+                'las_paths': './1-preads_ovl/merge-scripts/{job_id}/las_paths.json',
+                'merge_script': './1-preads_ovl/merge-scripts/{job_id}/merge-script.sh',
+                'merged_las_json': './1-preads_ovl/merge-scripts/{job_id}/merged_las.json',
+            },
+            outputs={
+                'merged_las': './1-preads_ovl/{job_pid}/merged.las',
+                'job_done': './1-preads_ovl/{job_pid}/merge.done',
+            },
+            parameters=parameters,
+        ),
     )
-    task = make_task(pype_tasks.task_merge_scatter)
-    wf.addTask(task)
-    wf.refreshTargets(exitOnFailure=exitOnFailure)
 
-    merge_tasks, p_ids_merged_las = create_merge_tasks(
-        pread_dir, scattered_fn)
-    wf.addTasks(merge_tasks)
-    task, las_fofn_plf, las_fopfn_plf = create_merge_gather_task(
-        os.path.join(pread_dir, 'merge-gather'), p_ids_merged_las)
-    wf.addTask(task)
-
-    wf.refreshTargets(exitOnFailure=exitOnFailure)
+    las_fofn_fn = os.path.join(pread_dir, 'merged-las-fofn', 'las.fofn')
+    las_fopfn_fn = os.path.join(pread_dir, 'merged-las-fofn', 'las.fopfn')
+    wf.addTask(gen_task(
+        script=pype_tasks.TASK_LAS_MERGE_GATHER_SCRIPT,
+        inputs={'gathered': gathered_fn,
+        },
+        outputs={'las_fofn': las_fofn_fn,
+                 'las_fopfn': las_fopfn_fn,
+        },
+        parameters=parameters,
+        rule_writer=rule_writer,
+    ))
 
     # Draft assembly (called 'fc_' for now)
     wf.max_jobs = config['fc_concurrent_jobs']
-    las_fofn_fn = fn(las_fofn_plf)
     preads_db_fn = fn(preads_db)
     db2falcon_dir = os.path.join(pread_dir, 'db2falcon')
     db2falcon_done_fn = os.path.join(db2falcon_dir, 'db2falcon_done')

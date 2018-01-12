@@ -243,7 +243,53 @@ def read_gathered_las(path):
     #    path, pprint.pformat(result)))
     return result
 
+TASK_LAS_MERGE_SCATTER_SCRIPT = """\
+python -m falcon_kit.mains.las_merge_scatter --db-prefix={params.db_prefix} --run-jobs-fn={input.run_jobs} --p-gathered-las-fn={input.p_gathered_las} --scattered-fn={output.scattered}
+"""
+def task_merge_scatter(self):
+    run_jobs_fn = self.run_jobs
+    gathered_las_fn = self.gathered_las
+    scatter_fn = self.scattered
+    par = self.parameters
+    db_prefix = par['db_prefix']
+    config = par['config']
+    func = task_run_las_merge
+    func_name = '{}.{}'.format(func.__module__, func.__name__)
 
+    merge_scripts = bash.scripts_merge(config, db_prefix, run_jobs_fn)
+    tasks = []
+    for p_id, merge_script, merged_las_fn in merge_scripts:
+        parameters = {'merge_script': merge_script,
+                      'job_id': p_id,
+                      'config': config,
+                      'sge_option': config['sge_option_la'],
+                      }
+        job_done_fn = 'm_%05d_done' % p_id
+        inputs = {'gathered_las': gathered_las_fn}
+        outputs = {'job_done': job_done_fn,  # probably not needed anymore
+                   'merged_las': merged_las_fn,
+                   }
+        python_function = func_name,
+        URL = 'task://localhost/m_%05d_%s' % (p_id, db_prefix)
+        task_desc = {
+            'inputs': inputs,
+            'outputs': outputs,
+            'parameters': parameters,
+            'python_function': python_function,
+            'URL': URL,
+        }
+        tasks.append(task_desc)
+
+    content = json.dumps(tasks, sort_keys=True, indent=4,
+                         separators=(',', ': '))
+    open(scatter_fn, 'w').write(content)
+
+
+
+TASK_LAS_MERGE_SCRIPT = """\
+# Note: HPC.daligner chooses a merged filename in its generated script, so we will symlink to it.
+python -m falcon_kit.mains.las_merge --las-paths-fn={input.las_paths} --merge-script-fn={input.merge_script} --las-merged-fn-fn={input.merged_las_json} --las-merged-symlink-fn={output.merged_las} --job-done-fn={output.job_done}
+"""
 def task_run_las_merge(self):
     job_done = fn(self.job_done)
     gathered_las_fn = fn(self.gathered_las)
@@ -277,6 +323,26 @@ def task_run_las_merge(self):
     }
     support.run_las_merge(**args)
     self.generated_script_fn = script_fn
+
+
+TASK_LAS_MERGE_GATHER_SCRIPT = """\
+python -m falcon_kit.mains.las_merge_gather --gathered-fn={input.gathered} --las-fofn-fn={output.las_fofn} --las-fopfn-fn={output.las_fopfn}
+"""
+def task_merge_gather(self):
+    fofn_fn = fn(self.las_fofn)
+    with open(fofn_fn,  'w') as f:
+        # The keys are p_ids.
+        for filename in sorted(fn(plf) for plf in self.inputs.itervalues()):
+            print >>f, filename
+    fopfn_fn = fn(self.las_fopfn)
+    with open(fopfn_fn,  'w') as f:
+        # The keys are p_ids.
+        for filename, p_id in sorted((fn(plf), p_id) for (p_id, plf) in self.inputs.iteritems()):
+            print >>f, p_id, filename
+    #wdir = os.path.dirname(las_fofn_fn)
+    # pread_dir = os.path.dirname(wdir) # by convention, for now
+    # Generate las.fofn in run-dir. # No longer needed!
+    #system('find {}/m_*/ -name "preads.*.las" >| {}'.format(pread_dir, las_fofn_fn))
 
 
 def task_run_consensus(self):
@@ -338,45 +404,6 @@ def task_daligner_scatter(self):
             'URL': URL,
         }
         tasks.append(daligner_task)
-    content = json.dumps(tasks, sort_keys=True, indent=4,
-                         separators=(',', ': '))
-    open(scatter_fn, 'w').write(content)
-
-
-def task_merge_scatter(self):
-    run_jobs_fn = self.run_jobs
-    gathered_las_fn = self.gathered_las
-    scatter_fn = self.scattered
-    par = self.parameters
-    db_prefix = par['db_prefix']
-    config = par['config']
-    func = task_run_las_merge
-    func_name = '{}.{}'.format(func.__module__, func.__name__)
-
-    merge_scripts = bash.scripts_merge(config, db_prefix, run_jobs_fn)
-    tasks = []
-    for p_id, merge_script, merged_las_fn in merge_scripts:
-        parameters = {'merge_script': merge_script,
-                      'job_id': p_id,
-                      'config': config,
-                      'sge_option': config['sge_option_la'],
-                      }
-        job_done_fn = 'm_%05d_done' % p_id
-        inputs = {'gathered_las': gathered_las_fn}
-        outputs = {'job_done': job_done_fn,  # probably not needed anymore
-                   'merged_las': merged_las_fn,
-                   }
-        python_function = func_name,
-        URL = 'task://localhost/m_%05d_%s' % (p_id, db_prefix)
-        task_desc = {
-            'inputs': inputs,
-            'outputs': outputs,
-            'parameters': parameters,
-            'python_function': python_function,
-            'URL': URL,
-        }
-        tasks.append(task_desc)
-
     content = json.dumps(tasks, sort_keys=True, indent=4,
                          separators=(',', ': '))
     open(scatter_fn, 'w').write(content)
@@ -452,23 +479,6 @@ def task_cns_gather(self):
     with open(fofn_fn,  'w') as f:
         for filename in sorted(fn(plf) for plf in self.inputs.itervalues()):
             print >>f, filename
-
-
-def task_merge_gather(self):
-    fofn_fn = fn(self.las_fofn)
-    with open(fofn_fn,  'w') as f:
-        # The keys are p_ids.
-        for filename in sorted(fn(plf) for plf in self.inputs.itervalues()):
-            print >>f, filename
-    fopfn_fn = fn(self.las_fopfn)
-    with open(fopfn_fn,  'w') as f:
-        # The keys are p_ids.
-        for filename, p_id in sorted((fn(plf), p_id) for (p_id, plf) in self.inputs.iteritems()):
-            print >>f, p_id, filename
-    #wdir = os.path.dirname(las_fofn_fn)
-    # pread_dir = os.path.dirname(wdir) # by convention, for now
-    # Generate las.fofn in run-dir. # No longer needed!
-    #system('find {}/m_*/ -name "preads.*.las" >| {}'.format(pread_dir, las_fofn_fn))
 
 
 TASK_DUMP_RAWREAD_IDS_SCRIPT = """\
