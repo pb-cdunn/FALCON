@@ -383,46 +383,53 @@ def run(wf, config, rule_writer,
     preads_nblock = support.get_nblock(fn(preads_db))
     # run daligner
     wf.max_jobs = config['pda_concurrent_jobs']
-    config['sge_option_da'] = config['sge_option_pda']
-
+    #config['sge_option_da'] = config['sge_option_pda']
     scattered_fn = os.path.join(
         pread_dir, 'daligner-scatter', 'scattered.json')
-    make_daligner_scatter = PypeTask(
+    params = dict(parameters)
+    params['db_prefix'] = 'preads'
+    params['nblock'] = preads_nblock
+    params['skip_checks'] = int(config.get('skip_checks', 0))
+    wf.addTask(gen_task(
+        script=pype_tasks.TASK_DALIGNER_SCATTER_SCRIPT,
         inputs={
-            'run_jobs_fn': run_jobs,
-            'db_build_done': pdb_build_done,
+            'run_jobs': fn(run_jobs),
+            'db_build_done': fn(pdb_build_done),
         },
         outputs={
-            'scatter_fn': scattered_fn,
+            'scattered': scattered_fn,
         },
-        parameters={
-            'db_prefix': 'preads',
-            'nblock': preads_nblock,
-            'pread_aln': True,
-            'config': config,
-        },
+        parameters=params,
+        rule_writer=rule_writer,
+    ))
+
+    gathered_fn = os.path.join(pread_dir, 'daligner-gathered', 'gathered.json')
+    gen_parallel_tasks(
+        wf, rule_writer,
+        scattered_fn, gathered_fn,
+        run_dict=dict(
+            script=pype_tasks.TASK_DALIGNER_SCRIPT,
+            inputs={
+                'daligner_script_fn': '1-preads_ovl/daligner-scripts/{job_id}/daligner-script.sh',
+                'daligner_settings_fn': '1-preads_ovl/daligner-scripts/{job_id}/settings.json',
+            },
+            outputs={
+                'job_done': '1-preads_ovl/{job_id}/daligner.done',
+            },
+            parameters=parameters,
+        ),
     )
-    task = make_daligner_scatter(pype_tasks.task_daligner_scatter)
-    wf.addTask(task)
-    wf.refreshTargets(exitOnFailure=exitOnFailure)
 
-    daligner_tasks, daligner_out = create_daligner_tasks(
-        pread_dir, scattered_fn)
-    wf.addTasks(daligner_tasks)
-
-    p_gathered_las_plf = makePypeLocalFile(os.path.join(
-        pread_dir, 'gathered-las', 'gathered-las.txt'))
-    parameters = {
-        'nblock': preads_nblock,
-    }
-    make_daligner_gather = PypeTask(
-        inputs=daligner_out,
-        outputs={'gathered': p_gathered_las_plf},
+    p_gathered_las_fn = os.path.join(pread_dir, 'daligner-intermediate-gathered-las', 'gathered-las.txt')
+    wf.addTask(gen_task(
+        script=pype_tasks.TASK_DALIGNER_GATHER_SCRIPT,
+        inputs={'gathered': gathered_fn,
+        },
+        outputs={'las_paths': p_gathered_las_fn,
+        },
         parameters=parameters,
-    )
-    check_p_da_task = make_daligner_gather(pype_tasks.task_daligner_gather)
-    wf.addTask(check_p_da_task)
-    wf.refreshTargets(exitOnFailure=exitOnFailure)
+        rule_writer=rule_writer,
+    ))
 
     # Merge .las files.
     #wf.max_jobs = config['pla_concurrent_jobs']
@@ -436,7 +443,7 @@ def run(wf, config, rule_writer,
         script=pype_tasks.TASK_LAS_MERGE_SCATTER_SCRIPT,
         inputs={
             'run_jobs': fn(run_jobs),
-            'p_gathered_las': fn(p_gathered_las_plf),
+            'p_gathered_las': p_gathered_las_fn,
         },
         outputs={
             'scattered': scattered_fn,

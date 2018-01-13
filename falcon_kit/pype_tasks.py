@@ -370,7 +370,16 @@ def task_run_consensus(self):
     support.run_consensus(**args)
     self.generated_script_fn = script_fn
 
-
+TASK_DALIGNER_SCATTER_SCRIPT = """\
+python -m falcon_kit.mains.daligner_scatter --run-jobs-fn={input.run_jobs} --db-prefix={params.db_prefix} --nblock={params.nblock} --skip-checks={params.skip_checks} --pread-aln --scattered-fn={output.scattered}
+"""
+TASK_DALIGNER_SCRIPT = """\
+# Note: HPC.daligner chooses a merged filename in its generated script, so we will symlink to it.
+python -m falcon_kit.mains.daligner --daligner-settings-fn={input.daligner_settings} --daligner-script-fn={input.daligner_script} --job-done-fn={output.job_done}
+"""
+TASK_DALIGNER_GATHER_SCRIPT = """\
+python -m falcon_kit.mains.daligner_gather --gathered-fn={input.gathered} --las-paths-fn={output.las_paths}
+"""
 def task_daligner_scatter(self):
     run_jobs_fn = self.run_jobs_fn
     db_build_done = self.db_build_done
