@@ -11,20 +11,24 @@ def run(las_paths_fn, merge_script_fn, las_merged_fn_fn, las_merged_symlink_fn, 
     cwd = os.getcwd()
     LOG.info('Merging las files from {!r} using {!r} to write {!r} (symlink to name from {!r}) (and {!r})'.format(
         las_paths_fn, merge_script_fn, las_merged_symlink_fn, las_merged_fn_fn, job_done_fn))
+    if os.path.lexists(las_merged_symlink_fn):
+        os.unlink(las_merged_symlink_fn)
     las_merged_name_fn = io.deserialize(las_merged_fn_fn)
     script = open(merge_script_fn).read()
     las_paths = io.deserialize(las_paths_fn)
+    src_dir = os.path.normpath(os.path.dirname(las_paths_fn))
     for las_path in las_paths:
-        assert os.path.isabs(las_path)
+        if not os.path.isabs(las_path):
+            las_path = os.path.abspath(os.path.join(src_dir, las_path))
         if os.path.commonprefix([las_path, cwd]) == '/':
             src = las_path
         else:
             src = os.path.relpath(las_path, cwd)
-        tgt = os.path.join(cwd, os.path.basename(las_path))
-        LOG.debug('symlink {!r} <- {!r}'.format(src, tgt))
-        if os.path.lexists(tgt):
-            os.unlink(tgt)
-        os.symlink(src, tgt)
+        name = os.path.join(cwd, os.path.basename(las_path))
+        LOG.debug('symlink {!r} <- {!r}'.format(src, name))
+        if os.path.lexists(name):
+            os.unlink(name)
+        os.symlink(src, name)
 
     script_fn = 'run_las_merge.sh'
     bash.write_script(script, script_fn, job_done_fn)

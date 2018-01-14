@@ -394,8 +394,6 @@ def run(wf, config, rule_writer,
         rule_writer=rule_writer,
     ))
 
-    preads_nblock = support.get_nblock(preads_db_fn) #### TODO ###############
-
     # run daligner
     wf.max_jobs = config['pda_concurrent_jobs']
     #config['sge_option_da'] = config['sge_option_pda']
@@ -403,13 +401,13 @@ def run(wf, config, rule_writer,
         pread_dir, 'daligner-scatter', 'scattered.json')
     params = dict(parameters)
     params['db_prefix'] = 'preads'
-    params['nblock'] = preads_nblock
+    #params['nblock'] = preads_nblock
     params['skip_checks'] = int(config.get('skip_checks', 0))
     wf.addTask(gen_task(
         script=pype_tasks.TASK_DALIGNER_SCATTER_SCRIPT,
         inputs={
             'run_jobs': run_jobs_fn,
-            'db_build_done': fn(pdb_build_done),
+            'preads_db': preads_db_fn,
         },
         outputs={
             'scattered': scattered_fn,

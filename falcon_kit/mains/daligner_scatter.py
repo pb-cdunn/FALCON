@@ -5,10 +5,13 @@ import os
 import sys
 from .. import io
 from .. import bash
+from .. import run_support
 
 LOG = logging.getLogger()
 
-def run(db_prefix, pread_aln, skip_checks, run_jobs_fn, nblock, scattered_fn):
+def run(db_prefix, pread_aln, skip_checks, run_jobs_fn, preads_db_fn, scattered_fn):
+    nblock = run_support.get_nblock(preads_db_fn)
+
     db_build_done_fn = None
     daligner_scripts = bash.scripts_daligner(run_jobs_fn, db_prefix, db_build_done_fn, nblock=nblock, pread_aln=pread_aln, skip_check=skip_checks)
     basedir = os.path.dirname(os.path.abspath(scattered_fn))
@@ -67,8 +70,8 @@ def parse_args(argv):
         help='Skip LAcheck calls after daligner. (0 => do not skip)',
     )
     parser.add_argument(
-        '--nblock', default=0,
-        help='Number of blocks',
+        '--preads-db-fn',
+        help='Dazzler DB of preads. (Used to calculate number of blocks.)',
     )
     parser.add_argument(
         '--pread-aln', action='store_true',

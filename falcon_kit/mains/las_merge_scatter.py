@@ -27,6 +27,7 @@ def run(run_jobs_fn, p_gathered_las_fn, db_prefix, scattered_fn):
     config = dict() # not used anyway
     merge_scripts = list(bash.scripts_merge(config, db_prefix, run_jobs_fn))
     gathered_dict = read_gathered_las(p_gathered_las_fn)
+    gathered_dict_dir = os.path.normpath(os.path.dirname(p_gathered_las_fn))
 
     basedir = os.path.dirname(os.path.abspath(scattered_fn))
     rootdir = os.path.dirname(os.path.dirname(basedir)) # for now
@@ -40,7 +41,12 @@ def run(run_jobs_fn, p_gathered_las_fn, db_prefix, scattered_fn):
         io.mkdirs(os.path.dirname(merge_script_fn), os.path.dirname(las_paths_fn), os.path.dirname(merged_las_json_fn))
         with open(merge_script_fn, 'w') as stream:
             stream.write(merge_script)
-        las_paths = gathered_dict[p_id]
+        # las_paths must be updated for new relative paths
+        las_paths_dir = os.path.normpath(os.path.dirname(las_paths_fn))
+        las_paths = list()
+        for p in gathered_dict[p_id]:
+            updated_relative_path = os.path.relpath(os.path.join(gathered_dict_dir, p), las_paths_dir)
+            las_paths.append(updated_relative_path)
         io.serialize(las_paths_fn, las_paths)
         io.serialize(merged_las_json_fn, merged_las_fn)
 

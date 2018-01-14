@@ -376,7 +376,7 @@ python -m falcon_kit.mains.build_pdb --input-fofn-fn={input.preads_fofn} --confi
 touch {output.db_build_done}
 """
 TASK_DALIGNER_SCATTER_SCRIPT = """\
-python -m falcon_kit.mains.daligner_scatter --run-jobs-fn={input.run_jobs} --db-prefix={params.db_prefix} --nblock={params.nblock} --skip-checks={params.skip_checks} --pread-aln --scattered-fn={output.scattered}
+python -m falcon_kit.mains.daligner_scatter --run-jobs-fn={input.run_jobs} --db-prefix={params.db_prefix} --preads-db-fn={input.preads_db} --skip-checks={params.skip_checks} --pread-aln --scattered-fn={output.scattered}
 """
 TASK_DALIGNER_SCRIPT = """\
 # Note: HPC.daligner chooses a merged filename in its generated script, so we will symlink to it.
