@@ -1,9 +1,13 @@
+"""This was copied from falcon_unzip, but we
+needed to modify the TASK SCRIPT to use our copy of
+generic_gather.py
+"""
 from pypeflow.sample_tasks import gen_task as pype_gen_task
 from . import io
 import os
 
 TASK_GENERIC_GATHER_SCRIPT = """
-python -m falcon_unzip.mains.generic_gather --scattered-fn={input.scattered} --gathered-fn={output.gathered}
+python -m falcon_kit.mains.generic_gather --scattered-fn={input.scattered} --gathered-fn={output.gathered}
 """
 
 
