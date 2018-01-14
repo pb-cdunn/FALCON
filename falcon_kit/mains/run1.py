@@ -335,21 +335,19 @@ def run(wf, config, rule_writer,
         wf.addTask(task)
 
         rdir = os.path.join(rawread_dir, 'report')
-        pre_assembly_report_plf = makePypeLocalFile(
-            os.path.join(rdir, 'pre_assembly_stats.json'))
-        parameters = dict(config)
-        parameters['cwd'] = rdir
-        make_task = PypeTask(
-            inputs={'length_cutoff_fn': length_cutoff_plf,
-                    'raw_reads_db': raw_reads_db_plf,
-                    'preads_fofn': preads_fofn_plf, },
-            outputs={'pre_assembly_report': pre_assembly_report_plf, },
-            parameters=parameters,
-        )
-        task = make_task(pype_tasks.task_report_pre_assembly)
-        wf.addTask(task)
-
-        wf.refreshTargets(exitOnFailure=exitOnFailure)
+        pre_assembly_report_fn = os.path.join(rdir, 'pre_assembly_stats.json')
+        params = dict(parameters)
+        params['length_cutoff_user'] = config['length_cutoff']
+        params['genome_length'] = config['genome_size'] # note different name; historical
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_REPORT_PRE_ASSEMBLY_SCRIPT,
+            inputs={'length_cutoff': fn(length_cutoff_plf),
+                    'raw_reads_db': fn(raw_reads_db_plf),
+                    'preads_fofn': fn(preads_fofn_plf), },
+            outputs={'pre_assembly_report': pre_assembly_report_fn, },
+            parameters=params,
+            rule_writer=rule_writer,
+        ))
 
     if config['target'] == 'pre-assembly':
         LOG.info('Quitting after stage-0 for "pre-assembly" target.')
@@ -357,6 +355,7 @@ def run(wf, config, rule_writer,
 
     # build pread database
     if config['input_type'] == 'preads':
+        """
         preads_fofn_plf = makePypeLocalFile(os.path.join(
             pread_dir, 'preads-fofn-abs', os.path.basename(config['input_fofn'])))
         make_fofn_abs_task = PypeTask(inputs={'i_fofn': input_fofn_plf},
@@ -367,6 +366,8 @@ def run(wf, config, rule_writer,
             pype_tasks.task_make_fofn_abs_preads)
         wf.addTasks([fofn_abs_task])
         wf.refreshTargets([fofn_abs_task])
+        """
+        raise Exception('TODO')
 
     #parameters = {'work_dir': pread_dir,
     #              'sge_option': config['sge_option_pda'],
