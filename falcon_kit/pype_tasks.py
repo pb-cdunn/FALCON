@@ -370,6 +370,11 @@ def task_run_consensus(self):
     support.run_consensus(**args)
     self.generated_script_fn = script_fn
 
+TASK_BUILD_PDB_SCRIPT = """\
+python -m falcon_kit.mains.build_pdb --input-fofn-fn={input.preads_fofn} --config-fn={input.config} --run-jobs-fn={output.run_jobs} --job-done-fn={output.db_build_done}
+# TODO: Verify that input.preads_db exists.
+touch {output.db_build_done}
+"""
 TASK_DALIGNER_SCATTER_SCRIPT = """\
 python -m falcon_kit.mains.daligner_scatter --run-jobs-fn={input.run_jobs} --db-prefix={params.db_prefix} --nblock={params.nblock} --skip-checks={params.skip_checks} --pread-aln --scattered-fn={output.scattered}
 """

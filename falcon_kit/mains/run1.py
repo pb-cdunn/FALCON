@@ -2,6 +2,7 @@ from ..pype import (gen_task, gen_parallel_tasks) # copied verbatim from falcon_
 from .. import run_support as support
 from .. import bash, pype_tasks, snakemake
 from ..util.system import (only_these_symlinks, lfs_setstripe_maybe)
+from .. import io
 # pylint: disable=no-name-in-module, import-error, fixme, line-too-long
 from pypeflow.simple_pwatcher_bridge import (PypeProcWatcherWorkflow, MyFakePypeThreadTaskBase,
                                              makePypeLocalFile, fn, PypeTask)
@@ -146,16 +147,18 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
                                  use_tmpdir=config.get('use_tmpdir'),
                                  squash=squash
                                  )
+    general_config_fn = './config.json' # must not be in a task-dir
+    io.serialize(general_config_fn, config)
     with open('foo.snake', 'w') as snakemake_writer:
         rule_writer = snakemake.SnakemakeRuleWriter(snakemake_writer)
         run(wf, config, rule_writer,
-            os.path.abspath(input_config_fn),
+            os.path.abspath(general_config_fn),
             input_fofn_plf=input_fofn_plf,
             )
 
 
 def run(wf, config, rule_writer,
-        input_config_fn,
+        general_config_fn,
         input_fofn_plf,
         ):
     """
@@ -163,6 +166,11 @@ def run(wf, config, rule_writer,
     * LOG
     * run_support.logger
     """
+    general_config = io.deserialize(general_config_fn)
+    if general_config != config:
+        msg = 'Config from {!r} != passed config'.format(general_config_fn)
+        LOG.error(msg)
+        raise Exception(msg)
     rawread_dir = os.path.abspath('./0-rawreads')
     pread_dir = os.path.abspath('./1-preads_ovl')
     falcon_asm_dir = os.path.abspath('./2-asm-falcon')
@@ -178,6 +186,8 @@ def run(wf, config, rule_writer,
 
     assert config['input_type'] in (
         'raw', 'preads'), 'Invalid input_type=={!r}'.format(config['input_type'])
+
+    # Store config as JSON, available to many tasks.
 
     if config['input_type'] == 'raw':
         rawread_fofn_plf = makePypeLocalFile(os.path.join(
@@ -198,7 +208,7 @@ def run(wf, config, rule_writer,
         run_jobs = makePypeLocalFile(os.path.join(rawread_dir, 'run_jobs.sh'))
         parameters = {'work_dir': rawread_dir,
                       'sge_option': config['sge_option_da'],
-                      'config_fn': input_config_fn,
+                      #'config_fn': input_config_fn,
                       'config': config}
 
         length_cutoff_plf = makePypeLocalFile(
@@ -358,29 +368,34 @@ def run(wf, config, rule_writer,
         wf.addTasks([fofn_abs_task])
         wf.refreshTargets([fofn_abs_task])
 
-    pdb_build_done = makePypeLocalFile(
-        os.path.join(pread_dir, 'pdb_build_done'))
-    parameters = {'work_dir': pread_dir,
-                  'sge_option': config['sge_option_pda'],
-                  'config_fn': input_config_fn,
-                  'config': config}
+    #parameters = {'work_dir': pread_dir,
+    #              'sge_option': config['sge_option_pda'],
+    #              #'config_fn': input_config_fn,
+    #              'config': config}
+    parameters = dict()
 
-    run_jobs = makePypeLocalFile(os.path.join(pread_dir, 'run_jobs.sh'))
+    pdb_build_done = os.path.join(pread_dir, 'pdb_build_done')
+    run_jobs_fn = os.path.join(pread_dir, 'run_jobs.sh')
+    preads_db_fn = os.path.join(pread_dir, 'preads.db')
     # Also .preads.*, of course.
-    preads_db = makePypeLocalFile(os.path.join(pread_dir, 'preads.db'))
-    make_build_pdb_task = PypeTask(inputs={'preads_fofn': preads_fofn_plf},
-                                   outputs={'pdb_build_done': pdb_build_done,
-                                            'preads_db': preads_db,
-                                            'run_jobs': run_jobs,
-                                            },
-                                   parameters=parameters,
-                                   )
-    build_pdb_task = make_build_pdb_task(pype_tasks.task_build_pdb)
 
-    wf.addTasks([build_pdb_task])
-    wf.refreshTargets([pdb_build_done])
+    wf.addTask(gen_task(
+        script=pype_tasks.TASK_BUILD_PDB_SCRIPT,
+        inputs={
+            'config': general_config_fn,
+            'preads_fofn': fn(preads_fofn_plf),
+        },
+        outputs={
+            'run_jobs': run_jobs_fn,
+            'preads_db': preads_db_fn,
+            'db_build_done': pdb_build_done, # only for ordering
+        },
+        parameters=parameters,
+        rule_writer=rule_writer,
+    ))
 
-    preads_nblock = support.get_nblock(fn(preads_db))
+    preads_nblock = support.get_nblock(preads_db_fn) #### TODO ###############
+
     # run daligner
     wf.max_jobs = config['pda_concurrent_jobs']
     #config['sge_option_da'] = config['sge_option_pda']
@@ -393,7 +408,7 @@ def run(wf, config, rule_writer,
     wf.addTask(gen_task(
         script=pype_tasks.TASK_DALIGNER_SCATTER_SCRIPT,
         inputs={
-            'run_jobs': fn(run_jobs),
+            'run_jobs': run_jobs_fn,
             'db_build_done': fn(pdb_build_done),
         },
         outputs={
@@ -442,7 +457,7 @@ def run(wf, config, rule_writer,
     wf.addTask(gen_task(
         script=pype_tasks.TASK_LAS_MERGE_SCATTER_SCRIPT,
         inputs={
-            'run_jobs': fn(run_jobs),
+            'run_jobs': run_jobs_fn,
             'p_gathered_las': p_gathered_las_fn,
         },
         outputs={
@@ -486,7 +501,6 @@ def run(wf, config, rule_writer,
 
     # Draft assembly (called 'fc_' for now)
     wf.max_jobs = config['fc_concurrent_jobs']
-    preads_db_fn = fn(preads_db)
     db2falcon_dir = os.path.join(pread_dir, 'db2falcon')
     db2falcon_done_fn = os.path.join(db2falcon_dir, 'db2falcon_done')
     preads4falcon_fn = os.path.join(db2falcon_dir, 'preads4falcon.fasta')
