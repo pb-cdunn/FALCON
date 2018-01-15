@@ -370,6 +370,15 @@ def task_run_consensus(self):
     support.run_consensus(**args)
     self.generated_script_fn = script_fn
 
+TASK_CONSENSUS_SCATTER_SCRIPT = """\
+python -m falcon_kit.mains.consensus_scatter --las-fopfn-fn={input.las_fopfn} --db-fn={input.raw_reads_db} --length-cutoff-fn={input.length_cutoff} --config-fn={input.config} --scattered-fn={output.scattered}
+"""
+TASK_CONSENSUS_TASK_SCRIPT = """\
+python -m falcon_kit.mains.consensus_task --las-fn={input.las} --db-fn={input.db} --length-cutoff-fn={input.length_cutoff} --config-fn={input.config} --fasta-fn={output.fasta}
+"""
+TASK_CONSENSUS_GATHER_SCRIPT = """\
+python -m falcon_kit.mains.consensus_gather --gathered-fn={input.gathered} --preads-fofn-fn={output.preads_fofn}
+"""
 TASK_REPORT_PRE_ASSEMBLY_SCRIPT = """\
 python -m falcon_kit.mains.task_report_pre_assembly --genome-length={params.genome_length} --length-cutoff-user={params.length_cutoff_user} --length-cutoff-fn={input.length_cutoff} --raw-reads-db-fn={input.raw_reads_db} --preads-fofn-fn={input.preads_fofn} --pre-assembly-report-fn={output.pre_assembly_report}
 """

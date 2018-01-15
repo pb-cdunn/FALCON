@@ -308,31 +308,51 @@ def run(wf, config, rule_writer,
 
         scattered_fn = os.path.join(
             rawread_dir, 'cns-scatter', 'scattered.json')
-        make_task = PypeTask(
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_CONSENSUS_SCATTER_SCRIPT,
             inputs={
-                'gathered': las_fopfn_plf,
-                'db': raw_reads_db_plf,
+                'las_fopfn': fn(las_fopfn_plf),
+                'raw_reads_db': fn(raw_reads_db_plf),
+                'length_cutoff': fn(length_cutoff_plf),
+                'config': general_config_fn,
             },
             outputs={
                 'scattered': scattered_fn,
             },
-            parameters={
-                'db_prefix': 'raw_reads',
-                'config': config,
-            },
+            parameters={},
+            rule_writer=rule_writer,
+        ))
+
+        gathered_fn = os.path.join(rawread_dir, 'cns-gather', 'gathered.json')
+        gen_parallel_tasks(
+            wf, rule_writer,
+            scattered_fn, gathered_fn,
+            run_dict=dict(
+                script=pype_tasks.TASK_CONSENSUS_TASK_SCRIPT,
+                inputs = {
+                    'las': '0-rawreads/cns-scatter/{cns_id}/merged.las',
+                    'db': fn(raw_reads_db_plf),
+                    'length_cutoff': fn(length_cutoff_plf),
+                    'config': general_config_fn,
+                },
+                outputs = {
+                    'fasta': '0-rawreads/consensus/{cns_id}/consensus.fasta',
+                },
+                parameters={},
+            ),
         )
-        task = make_task(pype_tasks.task_consensus_scatter)
-        wf.addTask(task)
-        wf.refreshTargets(exitOnFailure=exitOnFailure)
-
-        tasks, consensus_out = create_consensus_tasks(
-            rawread_dir, scattered_fn)
-        wf.addTasks(tasks)
-        wf.refreshTargets(exitOnFailure=exitOnFailure)
-
-        task, preads_fofn_plf = create_consensus_gather_task(
-            os.path.join(rawread_dir, 'preads'), consensus_out)
-        wf.addTask(task)
+        preads_fofn_fn = os.path.join(rawread_dir, 'preads', 'input_preads.fofn')
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_CONSENSUS_GATHER_SCRIPT,
+            inputs={
+                'gathered': gathered_fn,
+            },
+            outputs={
+                'preads_fofn': preads_fofn_fn,
+            },
+            parameters=parameters,
+            rule_writer=rule_writer,
+        ))
 
         rdir = os.path.join(rawread_dir, 'report')
         pre_assembly_report_fn = os.path.join(rdir, 'pre_assembly_stats.json')
@@ -343,8 +363,10 @@ def run(wf, config, rule_writer,
             script=pype_tasks.TASK_REPORT_PRE_ASSEMBLY_SCRIPT,
             inputs={'length_cutoff': fn(length_cutoff_plf),
                     'raw_reads_db': fn(raw_reads_db_plf),
-                    'preads_fofn': fn(preads_fofn_plf), },
-            outputs={'pre_assembly_report': pre_assembly_report_fn, },
+                    'preads_fofn': preads_fofn_fn,
+            },
+            outputs={'pre_assembly_report': pre_assembly_report_fn,
+            },
             parameters=params,
             rule_writer=rule_writer,
         ))
@@ -384,7 +406,7 @@ def run(wf, config, rule_writer,
         script=pype_tasks.TASK_BUILD_PDB_SCRIPT,
         inputs={
             'config': general_config_fn,
-            'preads_fofn': fn(preads_fofn_plf),
+            'preads_fofn': preads_fofn_fn,
         },
         outputs={
             'run_jobs': run_jobs_fn,
