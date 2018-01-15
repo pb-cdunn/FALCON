@@ -244,7 +244,7 @@ def read_gathered_las(path):
     return result
 
 TASK_LAS_MERGE_SCATTER_SCRIPT = """\
-python -m falcon_kit.mains.las_merge_scatter --db-prefix={params.db_prefix} --run-jobs-fn={input.run_jobs} --p-gathered-las-fn={input.p_gathered_las} --scattered-fn={output.scattered}
+python -m falcon_kit.mains.las_merge_scatter --db-prefix={params.db_prefix} --stage={params.stage} --run-jobs-fn={input.run_jobs} --p-gathered-las-fn={input.p_gathered_las} --scattered-fn={output.scattered}
 """
 def task_merge_scatter(self):
     run_jobs_fn = self.run_jobs

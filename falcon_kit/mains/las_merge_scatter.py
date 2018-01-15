@@ -21,7 +21,7 @@ def read_gathered_las(path):
     #    path, pprint.pformat(result)))
     return result
 
-def run(run_jobs_fn, p_gathered_las_fn, db_prefix, scattered_fn):
+def run(run_jobs_fn, p_gathered_las_fn, db_prefix, stage, scattered_fn):
     LOG.info('Scattering las from {!r} (based on {!r}) into {!r}.'.format(
         p_gathered_las_fn, run_jobs_fn, scattered_fn))
     config = dict() # not used anyway
@@ -35,9 +35,9 @@ def run(run_jobs_fn, p_gathered_las_fn, db_prefix, scattered_fn):
     for p_id, merge_script, merged_las_fn in merge_scripts:
         job_id = 'm_%05d' %p_id
         # Write the scattered inputs.
-        merge_script_fn = '{rootdir}/1-preads_ovl/merge-scripts/{job_id}/merge-script.sh'.format(**locals())
-        las_paths_fn = '{rootdir}/1-preads_ovl/merge-scripts/{job_id}/las_paths.json'.format(**locals())
-        merged_las_json_fn = '{rootdir}/1-preads_ovl/merge-scripts/{job_id}/merged_las.json'.format(**locals())
+        merge_script_fn = '{rootdir}/{stage}/merge-scripts/{job_id}/merge-script.sh'.format(**locals())
+        las_paths_fn = '{rootdir}/{stage}/merge-scripts/{job_id}/las_paths.json'.format(**locals())
+        merged_las_json_fn = '{rootdir}/{stage}/merge-scripts/{job_id}/merged_las.json'.format(**locals())
         io.mkdirs(os.path.dirname(merge_script_fn), os.path.dirname(las_paths_fn), os.path.dirname(merged_las_json_fn))
         with open(merge_script_fn, 'w') as stream:
             stream.write(merge_script)
@@ -58,8 +58,8 @@ def run(run_jobs_fn, p_gathered_las_fn, db_prefix, scattered_fn):
                 merged_las_json = merged_las_json_fn,
         )
         job['output'] = dict(
-                merged_las = '{rootdir}/1-preads_ovl/{job_id}/merged.las'.format(**locals()),
-                job_done = '{rootdir}/1-preads_ovl/{job_id}/merge.done'.format(**locals()),
+                merged_las = '{rootdir}/{stage}/{job_id}/merged.las'.format(**locals()),
+                job_done = '{rootdir}/{stage}/{job_id}/merge.done'.format(**locals()),
         )
         job['params'] = dict(
                 actual_merged_las = merged_las_fn,
@@ -91,8 +91,12 @@ def parse_args(argv):
         help='Input. (Not sure of content yet.)',
     )
     parser.add_argument(
-        '--db-prefix', default='preads',
+        '--db-prefix', default='raw_reads',
         help='Input. Either preads or raw_reads.',
+    )
+    parser.add_argument(
+        '--stage', default='0-rawreads',
+        help='Input. Either 0-rawreads or 1-preads_ovl, for now.',
     )
     # Do we need config too?
     parser.add_argument(

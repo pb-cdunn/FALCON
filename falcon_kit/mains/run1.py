@@ -475,6 +475,7 @@ def run(wf, config, rule_writer,
     #wf.refreshTargets(exitOnFailure=exitOnFailure)
     params = dict(parameters)
     params['db_prefix'] = 'preads'
+    params['stage'] = os.path.basename(pread_dir)
     wf.addTask(gen_task(
         script=pype_tasks.TASK_LAS_MERGE_SCATTER_SCRIPT,
         inputs={
