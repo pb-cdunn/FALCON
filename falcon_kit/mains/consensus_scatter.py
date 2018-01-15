@@ -36,9 +36,10 @@ def run(las_fopfn_fn, db_fn, length_cutoff_fn, config_fn, scattered_fn):
         # since we know each merge-task is for a single block
         las_fn = las_fns[0]
         cns_id = 'cns_%05d' % int(p_id)
+        cns_id2 = cns_id
         ##out_done_fn = '%s_done' % cns_label
         #out_file_fn = '%s.fasta' % cns_label
-        symlinked_las_fn = '{rootdir}/0-rawreads/cns-scatter/{cns_id}/merged.las'.format(**locals())
+        symlinked_las_fn = '{rootdir}/0-rawreads/cns-scatter/{cns_id}/merged.{cns_id2}.las'.format(**locals())
         io.mkdirs(os.path.normpath(os.path.dirname(symlinked_las_fn)))
         os.symlink(las_fn, symlinked_las_fn)
 
@@ -51,7 +52,8 @@ def run(las_fopfn_fn, db_fn, length_cutoff_fn, config_fn, scattered_fn):
                 config = config_fn,
         )
         job['output'] = dict(
-                fasta = '{rootdir}/0-rawreads/consensus/{cns_id}/consensus.fasta'.format(**locals()),
+                fasta =
+                '{rootdir}/0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta'.format(**locals()),
         )
         job['params'] = dict(
         )

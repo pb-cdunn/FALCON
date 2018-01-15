@@ -79,14 +79,15 @@ date
 
 rule dynamic_foo_split:
     input:  '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads/cns-scatter/scattered.json'
-    output: db=dynamic('/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/raw_reads.db'), length_cutoff=dynamic('/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/length_cutoff'), config=dynamic('/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2.symlink/config.json'), las=dynamic('0-rawreads/cns-scatter/{cns_id}.symlink/merged.las')
-    shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} db="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/raw_reads.db" length_cutoff="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/length_cutoff" config="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2.symlink/config.json" las="0-rawreads/cns-scatter/{{cns_id}}.symlink/merged.las"'
+    output: db=dynamic('/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/raw_reads.db'), length_cutoff=dynamic('/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/length_cutoff'), config=dynamic('/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2.symlink/config.json'), las=dynamic('0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las')
+    shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} db="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/raw_reads.db" length_cutoff="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/length_cutoff" config="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2.symlink/config.json" las="0-rawreads/cns-scatter/{{cns_id}}.symlink/merged.{{cns_id2}}.las"'
 
 rule static_0_rawreads_consensus__cns_id_:
-    input:  db='/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/raw_reads.db', length_cutoff='/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/length_cutoff', config='/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2.symlink/config.json', las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.las'
-    output: fasta='0-rawreads/consensus/{cns_id}/consensus.fasta'
+    input:  db='/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/raw_reads.db', length_cutoff='/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/length_cutoff', config='/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2.symlink/config.json', las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las'
+    output: fasta='0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta'
     params:
-        cns_id="{cns_id}"
+        cns_id="{cns_id}",
+        cns_id2="{cns_id2}"
     shell:
         '''
 outdir=$(dirname {output[0]})
@@ -100,7 +101,7 @@ date
 '''
 
 rule dynamic_foo_merge:
-    input:  fasta=ancient(dynamic('0-rawreads/consensus/{cns_id}/consensus.fasta'))
+    input:  fasta=ancient(dynamic('0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta'))
     output: '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads/cns-gather/gathered.json'
     run:
         snake_merge_multi_dynamic(output[0],
@@ -108,9 +109,9 @@ rule dynamic_foo_merge:
               fasta=[str(i) for i in input.fasta]
             ),
             dict(
-              fasta="0-rawreads/consensus/{cns_id}/consensus.fasta"
+              fasta="0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta"
             ),
-            ["cns_id"] # all wildcards
+            ["cns_id", "cns_id2"] # all wildcards
         )
 
 rule static_0_rawreads_preads:

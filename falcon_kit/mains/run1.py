@@ -330,13 +330,13 @@ def run(wf, config, rule_writer,
             run_dict=dict(
                 script=pype_tasks.TASK_CONSENSUS_TASK_SCRIPT,
                 inputs = {
-                    'las': '0-rawreads/cns-scatter/{cns_id}/merged.las',
+                    'las': '0-rawreads/cns-scatter/{cns_id}/merged.{cns_id2}.las',
                     'db': fn(raw_reads_db_plf),
                     'length_cutoff': fn(length_cutoff_plf),
                     'config': general_config_fn,
                 },
                 outputs = {
-                    'fasta': '0-rawreads/consensus/{cns_id}/consensus.fasta',
+                    'fasta': '0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta',
                 },
                 parameters={},
             ),
