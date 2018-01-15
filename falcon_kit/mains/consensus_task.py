@@ -8,7 +8,7 @@ from .. import bash
 LOG = logging.getLogger()
 
 # This function was copied from bash.py and modified.
-def script_run_consensus(config, length_cutoff, db_fn, las_fn, out_file_bfn):
+def script_run_consensus(config, db_fn, las_fn, out_file_bfn):
     """config: dazcon, falcon_sense_greedy, falcon_sense_skip_contained, LA4Falcon_preload
     """
     params = dict(config)
@@ -44,9 +44,9 @@ def run(config_fn, length_cutoff_fn, las_fn, db_fn, fasta_fn):
     job_done_fn = 'job.done'
     length_cutoff = int(open(length_cutoff_fn).read())
     config = io.deserialize(config_fn)
-    config[length_cutoff] = length_cutoff
+    config['length_cutoff'] = length_cutoff
     script = script_run_consensus(
-        config, length_cutoff, db_fn, las_fn, os.path.basename(fasta_fn))
+        config, db_fn, las_fn, os.path.basename(fasta_fn))
     script_fn = 'run_consensus.sh'
     bash.write_script(script, script_fn, job_done_fn)
     io.syscall('bash -vex {}'.format(script_fn))

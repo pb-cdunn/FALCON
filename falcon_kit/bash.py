@@ -236,6 +236,7 @@ def script_build_pdb(config, input_fofn_bfn, run_jobs_bfn):
     params.update(locals())
     script = """\
 python -m falcon_kit.mains.copy_fofn --in={input_fofn_bfn} --out=preads.fofn --abs
+rm -f preads.db .preads.* # in case of re-run
 while read fn; do fasta2DB -v preads $fn; done < preads.fofn
 DBsplit {ovlp_DBsplit_option} preads
 {DBdust}
