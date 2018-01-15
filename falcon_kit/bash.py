@@ -223,6 +223,7 @@ HPC.daligner {pa_HPCdaligner_option} -mdust -H$CUTOFF raw_reads {last_block}-$LB
 
 
 def script_build_pdb(config, input_fofn_bfn, run_jobs_bfn):
+    # "bfn" used to mean base-file-name, but I do not remember why. ~cd
     last_block = 1
     count = """$(cat preads.db | LD_LIBRARY_PATH= awk '$1 == "blocks" {print $3}')"""
     params = dict(config)
@@ -234,7 +235,8 @@ def script_build_pdb(config, input_fofn_bfn, run_jobs_bfn):
 
     params.update(locals())
     script = """\
-while read fn; do fasta2DB -v preads $fn; done < {input_fofn_bfn}
+python -m falcon_kit.mains.copy_fofn --in={input_fofn_bfn} --out=preads.fofn --abs
+while read fn; do fasta2DB -v preads $fn; done < preads.fofn
 DBsplit {ovlp_DBsplit_option} preads
 {DBdust}
 LB={count}
