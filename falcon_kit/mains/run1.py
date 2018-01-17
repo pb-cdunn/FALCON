@@ -31,7 +31,7 @@ def create_daligner_tasks(basedir, scatter_fn):
     for section in content:
         parameters = section['parameters']
         inputs = section['inputs']
-        inputs['scatter_fn'] = scatter_fn
+        inputs['scatter_fn'] = os.path.abspath(scatter_fn)
         outputs = section['outputs']
         URL = section['URL']
         job_uid = parameters['job_uid']
@@ -55,7 +55,7 @@ def create_merge_tasks(basedir, scatter_fn):
     for section in content:
         parameters = section['parameters']
         inputs = section['inputs']
-        inputs['scatter_fn'] = scatter_fn
+        inputs['scatter_fn'] = os.path.abspath(scatter_fn)
         outputs = section['outputs']
         URL = section['URL']
         p_id = parameters['job_id']
@@ -171,13 +171,11 @@ def run(wf, config, rule_writer,
         msg = 'Config from {!r} != passed config'.format(general_config_fn)
         LOG.error(msg)
         raise Exception(msg)
-    rawread_dir = os.path.abspath('./0-rawreads')
-    pread_dir = os.path.abspath('./1-preads_ovl')
-    falcon_asm_dir = os.path.abspath('./2-asm-falcon')
-    script_dir = os.path.abspath('./scripts')
-    sge_log_dir = os.path.abspath('./sge_log')
+    rawread_dir = '0-rawreads'
+    pread_dir = '1-preads_ovl'
+    falcon_asm_dir = '2-asm-falcon'
 
-    for d in (rawread_dir, pread_dir, falcon_asm_dir, script_dir, sge_log_dir):
+    for d in (rawread_dir, pread_dir, falcon_asm_dir):
         support.make_dirs(d)
 
     # only matter for parallel jobs
@@ -206,11 +204,11 @@ def run(wf, config, rule_writer,
         rdb_build_done = makePypeLocalFile(
             os.path.join(rawread_dir, 'rdb_build_done'))
         run_jobs = makePypeLocalFile(os.path.join(rawread_dir, 'run_jobs.sh'))
-        parameters = {'work_dir': rawread_dir,
-                      'sge_option': config['sge_option_da'],
+        parameters = {#'work_dir': rawread_dir,
+                      #'sge_option': config['sge_option_da'],
                       #'config_fn': input_config_fn,
-                      'config': config}
-
+                      'config': config,
+        }
         length_cutoff_plf = makePypeLocalFile(
             os.path.join(rawread_dir, 'length_cutoff'))
         raw_reads_db_plf = makePypeLocalFile(
@@ -350,13 +348,13 @@ def run(wf, config, rule_writer,
             outputs={
                 'preads_fofn': preads_fofn_fn,
             },
-            parameters=parameters,
+            parameters={}, #=parameters,
             rule_writer=rule_writer,
         ))
 
         rdir = os.path.join(rawread_dir, 'report')
         pre_assembly_report_fn = os.path.join(rdir, 'pre_assembly_stats.json')
-        params = dict(parameters)
+        params = dict() #dict(parameters)
         params['length_cutoff_user'] = config['length_cutoff']
         params['genome_length'] = config['genome_size'] # note different name; historical
         wf.addTask(gen_task(
@@ -414,7 +412,7 @@ def run(wf, config, rule_writer,
             'preads_db': preads_db_fn,
             'db_build_done': pdb_build_done, # only for ordering
         },
-        parameters=parameters,
+        parameters={},
         rule_writer=rule_writer,
     ))
 
@@ -423,7 +421,7 @@ def run(wf, config, rule_writer,
     #config['sge_option_da'] = config['sge_option_pda']
     scattered_fn = os.path.join(
         pread_dir, 'daligner-scatter', 'scattered.json')
-    params = dict(parameters)
+    params = dict() #dict(parameters)
     params['db_prefix'] = 'preads'
     #params['nblock'] = preads_nblock
     params['skip_checks'] = int(config.get('skip_checks', 0))
@@ -453,7 +451,7 @@ def run(wf, config, rule_writer,
             outputs={
                 'job_done': '1-preads_ovl/{job_id}/daligner.done',
             },
-            parameters=parameters,
+            parameters={},
         ),
     )
 
@@ -464,7 +462,7 @@ def run(wf, config, rule_writer,
         },
         outputs={'las_paths': p_gathered_las_fn,
         },
-        parameters=parameters,
+        parameters={},
         rule_writer=rule_writer,
     ))
 
@@ -476,7 +474,7 @@ def run(wf, config, rule_writer,
     #wf.refreshTargets(exitOnFailure=exitOnFailure)
     params = dict(parameters)
     params['db_prefix'] = 'preads'
-    params['stage'] = os.path.basename(pread_dir)
+    params['stage'] = os.path.basename(pread_dir) # TODO(CD): Make this more clearly constant.
     wf.addTask(gen_task(
         script=pype_tasks.TASK_LAS_MERGE_SCATTER_SCRIPT,
         inputs={
@@ -502,10 +500,10 @@ def run(wf, config, rule_writer,
                 'merged_las_json': './1-preads_ovl/merge-scripts/{job_id}/merged_las.json',
             },
             outputs={
-                'merged_las': './1-preads_ovl/{job_pid}/merged.las',
-                'job_done': './1-preads_ovl/{job_pid}/merge.done',
+                'merged_las': './1-preads_ovl/{job_id}/merged.las',
+                'job_done': './1-preads_ovl/{job_id}/merge.done',
             },
-            parameters=parameters,
+            parameters={},
         ),
     )
 
@@ -518,7 +516,7 @@ def run(wf, config, rule_writer,
         outputs={'las_fofn': las_fofn_fn,
                  'las_fopfn': las_fopfn_fn,
         },
-        parameters=parameters,
+        parameters={},
         rule_writer=rule_writer,
     ))
 
@@ -535,14 +533,13 @@ def run(wf, config, rule_writer,
         outputs={'job_done': db2falcon_done_fn,
                  'preads4falcon': preads4falcon_fn,
                  },
-        parameters=parameters,
+        parameters={},
         rule_writer=rule_writer,
     ))
 
     falcon_asm_done_fn = os.path.join(falcon_asm_dir, 'falcon_asm_done')
     parameters = {
-        'sge_option': config['sge_option_fc'],
-        'topdir': os.getcwd(),
+        #'sge_option': config['sge_option_fc'], # if we want this, we must use double curlies
     }
     for key in ('overlap_filtering_setting', 'length_cutoff_pr', 'fc_ovlp_to_graph_option'):
         parameters[key] = config[key]
@@ -551,6 +548,7 @@ def run(wf, config, rule_writer,
         inputs={'db2falcon_done': db2falcon_done_fn, 'db_file': preads_db_fn,
                 'preads4falcon_fasta': preads4falcon_fn,
                 'las_fofn': las_fofn_fn,
+                'config': general_config_fn,
                 },
         outputs={'falcon_asm_done': falcon_asm_done_fn},
         parameters=parameters,

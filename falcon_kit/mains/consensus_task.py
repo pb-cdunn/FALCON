@@ -8,9 +8,11 @@ from .. import bash
 LOG = logging.getLogger()
 
 # This function was copied from bash.py and modified.
-def script_run_consensus(config, db_fn, las_fn, out_file_bfn):
+def script_run_consensus(config, db_fn, las_fn, out_file_fn):
     """config: dazcon, falcon_sense_greedy, falcon_sense_skip_contained, LA4Falcon_preload
     """
+    io.rm(out_file_fn) # in case of resume
+    out_file_bfn = out_file_fn + '.tmp'
     params = dict(config)
     length_cutoff = params['length_cutoff']
     bash_cutoff = '{}'.format(length_cutoff)
@@ -36,6 +38,7 @@ dazcon {pa_dazcon_option} -s {db_fn} -a {las_fn} >| {out_file_bfn}
 set -o pipefail
 CUTOFF=%(bash_cutoff)s
 %(run_consensus)s
+mv -f {out_file_bfn} {out_file_fn}
 """ % (locals())
     return script.format(**params)
 
@@ -46,7 +49,7 @@ def run(config_fn, length_cutoff_fn, las_fn, db_fn, fasta_fn):
     config = io.deserialize(config_fn)
     config['length_cutoff'] = length_cutoff
     script = script_run_consensus(
-        config, db_fn, las_fn, os.path.basename(fasta_fn))
+        config, db_fn, las_fn, os.path.basename(fasta_fn)) # not sure basename is really needed here
     script_fn = 'run_consensus.sh'
     bash.write_script(script, script_fn, job_done_fn)
     io.syscall('bash -vex {}'.format(script_fn))
