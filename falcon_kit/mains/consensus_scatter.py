@@ -41,7 +41,7 @@ def run(las_fopfn_fn, db_fn, length_cutoff_fn, config_fn, scattered_fn):
         #out_file_fn = '%s.fasta' % cns_label
         symlinked_las_fn = '{rootdir}/0-rawreads/cns-scatter/{cns_id}/merged.{cns_id2}.las'.format(**locals())
         io.mkdirs(os.path.normpath(os.path.dirname(symlinked_las_fn)))
-        os.symlink(las_fn, symlinked_las_fn)
+        io.symlink(las_fn, symlinked_las_fn)
 
         # Record in a job-dict.
         job = dict()

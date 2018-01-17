@@ -24,9 +24,16 @@ def gen_task(rule_writer, script, inputs, outputs, parameters={}):
         return rel
     inputs = get_rel(inputs)
     outputs = get_rel(outputs)
-    pt = pype_gen_task(script, inputs, outputs, parameters)
+
+    first_output_dir = os.path.normpath(os.path.dirname(outputs.values()[0]))
+    rel_topdir = os.path.relpath('.', first_output_dir) # redundant for rel-inputs, but fine
+    params = dict(parameters)
+    params['topdir'] = rel_topdir
+
+    pt = pype_gen_task(script, inputs, outputs, params)
+
     # Run pype_gen_task first because it can valid some stuff.
-    rule_writer(inputs, outputs, parameters, script)
+    rule_writer(inputs, outputs, params, script)
     return pt
 
 

@@ -170,6 +170,11 @@ def capture(cmd):
     return output
 
 
+def symlink(src, name, force=True):
+    if os.path.lexists(name):
+        os.unlink(name)
+    os.symlink(src, name)
+
 def rm(*f):
     syscall('rm -f {}'.format(' '.join(f)))
 
