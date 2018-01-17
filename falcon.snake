@@ -65,6 +65,7 @@ rule static_0_rawreads_cns_scatter:
     input:  raw_reads_db='0-rawreads/raw_reads.db', las_fopfn='0-rawreads/merge-gather/las.fopfn', config='config.json', length_cutoff='0-rawreads/length_cutoff'
     output: scattered='0-rawreads/cns-scatter/scattered.json'
     params:
+        topdir="../.."
     shell:
         '''
 outdir=$(dirname {output[0]})
@@ -78,12 +79,12 @@ date
 '''
 
 rule dynamic_foo_split:
-    input:  '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads/cns-scatter/scattered.json'
-    output: db=dynamic('/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/raw_reads.db'), length_cutoff=dynamic('/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/length_cutoff'), config=dynamic('/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2.symlink/config.json'), las=dynamic('0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las')
-    shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} db="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/raw_reads.db" length_cutoff="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/length_cutoff" config="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2.symlink/config.json" las="0-rawreads/cns-scatter/{{cns_id}}.symlink/merged.{{cns_id2}}.las"'
+    input:  '/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads/cns-scatter/scattered.json'
+    output: db=dynamic('/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/raw_reads.db'), length_cutoff=dynamic('/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/length_cutoff'), config=dynamic('/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0.symlink/config.json'), las=dynamic('0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las')
+    shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} db="/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/raw_reads.db" length_cutoff="/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/length_cutoff" config="/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0.symlink/config.json" las="0-rawreads/cns-scatter/{{cns_id}}.symlink/merged.{{cns_id2}}.las"'
 
 rule static_0_rawreads_consensus__cns_id_:
-    input:  db='/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/raw_reads.db', length_cutoff='/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads.symlink/length_cutoff', config='/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2.symlink/config.json', las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las'
+    input:  db='/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/raw_reads.db', length_cutoff='/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/length_cutoff', config='/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0.symlink/config.json', las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las'
     output: fasta='0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta'
     params:
         cns_id="{cns_id}",
@@ -102,7 +103,7 @@ date
 
 rule dynamic_foo_merge:
     input:  fasta=ancient(dynamic('0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta'))
-    output: '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/0-rawreads/cns-gather/gathered.json'
+    output: '/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads/cns-gather/gathered.json'
     run:
         snake_merge_multi_dynamic(output[0],
             dict(
@@ -118,7 +119,8 @@ rule static_0_rawreads_preads:
     input:  gathered='0-rawreads/cns-gather/gathered.json'
     output: preads_fofn='0-rawreads/preads/input_preads.fofn'
     params:
-        nblock="1"
+        topdir="../..",
+        nblock="2"
     shell:
         '''
 outdir=$(dirname {output[0]})
@@ -135,9 +137,10 @@ rule static_0_rawreads_report:
     input:  length_cutoff='0-rawreads/length_cutoff', preads_fofn='0-rawreads/preads/input_preads.fofn', raw_reads_db='0-rawreads/raw_reads.db'
     output: pre_assembly_report='0-rawreads/report/pre_assembly_stats.json'
     params:
-        length_cutoff_user="1000",
-        nblock="1",
-        genome_length="200000"
+        length_cutoff_user="-1",
+        topdir="../..",
+        nblock="2",
+        genome_length="5000"
     shell:
         '''
 outdir=$(dirname {output[0]})
@@ -154,6 +157,7 @@ rule static_1_preads_ovl:
     input:  config='config.json', preads_fofn='0-rawreads/preads/input_preads.fofn'
     output: run_jobs='1-preads_ovl/run_jobs.sh', preads_db='1-preads_ovl/preads.db', db_build_done='1-preads_ovl/pdb_build_done'
     params:
+        topdir=".."
     shell:
         '''
 outdir=$(dirname {output[0]})
@@ -173,7 +177,8 @@ rule static_1_preads_ovl_daligner_scatter:
     output: scattered='1-preads_ovl/daligner-scatter/scattered.json'
     params:
         db_prefix="preads",
-        skip_checks="0"
+        skip_checks="0",
+        topdir="../.."
     shell:
         '''
 outdir=$(dirname {output[0]})
@@ -187,7 +192,7 @@ date
 '''
 
 rule dynamic_foo1_split:
-    input:  '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/1-preads_ovl/daligner-scatter/scattered.json'
+    input:  '/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/1-preads_ovl/daligner-scatter/scattered.json'
     output: daligner_settings_fn=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json'), daligner_script_fn=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh')
     shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} daligner_settings_fn="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/settings.json" daligner_script_fn="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/daligner-script.sh"'
 
@@ -211,7 +216,7 @@ date
 
 rule dynamic_foo1_merge:
     input:  job_done=ancient(dynamic('1-preads_ovl/{job_id}/daligner.done'))
-    output: '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/1-preads_ovl/daligner-gathered/gathered.json'
+    output: '/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/1-preads_ovl/daligner-gathered/gathered.json'
     run:
         snake_merge_multi_dynamic(output[0],
             dict(
@@ -227,6 +232,7 @@ rule static_1_preads_ovl_daligner_intermediate_gathered_las:
     input:  gathered='1-preads_ovl/daligner-gathered/gathered.json'
     output: las_paths='1-preads_ovl/daligner-intermediate-gathered-las/gathered-las.txt'
     params:
+        topdir="../.."
     shell:
         '''
 outdir=$(dirname {output[0]})
@@ -244,6 +250,7 @@ rule static_1_preads_ovl_merge_scatter:
     output: scattered='1-preads_ovl/merge-scatter/scattered.json'
     params:
         db_prefix="preads",
+        topdir="../..",
         stage="1-preads_ovl"
     shell:
         '''
@@ -258,7 +265,7 @@ date
 '''
 
 rule dynamic_foo2_split:
-    input:  '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/1-preads_ovl/merge-scatter/scattered.json'
+    input:  '/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/1-preads_ovl/merge-scatter/scattered.json'
     output: las_paths=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/las_paths.json'), merged_las_json=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/merged_las.json'), merge_script=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/merge-script.sh')
     shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} las_paths="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/las_paths.json" merged_las_json="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merged_las.json" merge_script="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merge-script.sh"'
 
@@ -282,7 +289,7 @@ date
 
 rule dynamic_foo2_merge:
     input:  job_done=ancient(dynamic('1-preads_ovl/{job_pid}/merge.done')), merged_las=ancient(dynamic('1-preads_ovl/{job_pid}/merged.las'))
-    output: '/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2/1-preads_ovl/merge-gathered/gathered.json'
+    output: '/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/1-preads_ovl/merge-gathered/gathered.json'
     run:
         snake_merge_multi_dynamic(output[0],
             dict(
@@ -300,6 +307,7 @@ rule static_1_preads_ovl_merged_las_fofn:
     input:  gathered='1-preads_ovl/merge-gathered/gathered.json'
     output: las_fopfn='1-preads_ovl/merged-las-fofn/las.fopfn', las_fofn='1-preads_ovl/merged-las-fofn/las.fofn'
     params:
+        topdir="../.."
     shell:
         '''
 outdir=$(dirname {output[0]})
@@ -316,6 +324,7 @@ rule static_1_preads_ovl_db2falcon:
     input:  preads_db='1-preads_ovl/preads.db', las_fofn='1-preads_ovl/merged-las-fofn/las.fofn'
     output: job_done='1-preads_ovl/db2falcon/db2falcon_done', preads4falcon='1-preads_ovl/db2falcon/preads4falcon.fasta'
     params:
+        topdir="../.."
     shell:
         '''
 outdir=$(dirname {output[0]})
@@ -336,10 +345,10 @@ rule static_2_asm_falcon:
     input:  db2falcon_done='1-preads_ovl/db2falcon/db2falcon_done', db_file='1-preads_ovl/preads.db', las_fofn='1-preads_ovl/merged-las-fofn/las.fofn', preads4falcon_fasta='1-preads_ovl/db2falcon/preads4falcon.fasta'
     output: falcon_asm_done='2-asm-falcon/falcon_asm_done'
     params:
-        topdir="/localdisk/scratch/cdunn/src/fe/run/greg200k-sv2",
+        topdir="..",
         length_cutoff_pr="1",
-        sge_option="-pe smp 24 -q bigmem",
-        overlap_filtering_setting="--max_diff 120 --max_cov 120 --min_cov 2 --n_core 12",
+        sge_option="-pe smp 24 -q bash -C ${CMD} >| ${STDOUT_FILE} 2>| ${STDERR_FILE}",
+        overlap_filtering_setting="--max_diff 10000 --max_cov 100000 --min_cov 1 --min_len 1 --bestn 1000 --n_core 0",
         fc_ovlp_to_graph_option=" --min_len 1"
     shell:
         '''
