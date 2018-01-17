@@ -54,7 +54,7 @@ def write_sub_script(ofs, script):
 
 def write_script(script, script_fn, job_done_fn=None):
     if job_done_fn:
-        script += '\ntouch {}'.format(job_done_fn)
+        script += '\ntouch {}\n'.format(job_done_fn)
     with open(script_fn, 'w') as ofs:
         exe = write_sub_script(ofs, script)
 
