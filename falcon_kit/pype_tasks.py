@@ -380,7 +380,7 @@ TASK_CONSENSUS_GATHER_SCRIPT = """\
 python -m falcon_kit.mains.consensus_gather --gathered-fn={input.gathered} --preads-fofn-fn={output.preads_fofn}
 """
 TASK_REPORT_PRE_ASSEMBLY_SCRIPT = """\
-python -m falcon_kit.mains.task_report_pre_assembly --genome-length={params.genome_length} --length-cutoff-user={params.length_cutoff_user} --length-cutoff-fn={input.length_cutoff} --raw-reads-db-fn={input.raw_reads_db} --preads-fofn-fn={input.preads_fofn} --pre-assembly-report-fn={output.pre_assembly_report}
+python -m falcon_kit.mains.task_report_pre_assembly --config-fn={input.config} --length-cutoff-fn={input.length_cutoff} --raw-reads-db-fn={input.raw_reads_db} --preads-fofn-fn={input.preads_fofn} --pre-assembly-report-fn={output.pre_assembly_report}
 """
 TASK_BUILD_PDB_SCRIPT = """\
 python -m falcon_kit.mains.build_pdb --input-fofn-fn={input.preads_fofn} --config-fn={input.config} --run-jobs-fn={output.run_jobs} --job-done-fn={output.db_build_done}

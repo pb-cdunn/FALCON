@@ -9,11 +9,17 @@ from .. import run_support
 LOG = logging.getLogger()
 
 
-def run(genome_length, length_cutoff_user, length_cutoff_fn, raw_reads_db_fn, preads_fofn_fn, pre_assembly_report_fn):
+def run(config_fn, length_cutoff_fn, raw_reads_db_fn, preads_fofn_fn, pre_assembly_report_fn):
+    config = io.deserialize(config_fn)
+    genome_length = int(config['genome_size'])
+    length_cutoff_user = int(config['length_cutoff'])
     # Update length_cutoff if auto-calc (when length_cutoff is negative).
     # length_cutoff_fn was created long ago, so no filesystem issues.
     length_cutoff = run_support.get_length_cutoff(
         length_cutoff_user, length_cutoff_fn)
+    # Hmmm. Actually, I think we now write the user length_cutoff into the length_cutoff file,
+    # if not -1. TODO(CD): Check on that, and simplify here if so.
+
     script = bash.script_run_report_pre_assembly(
         raw_reads_db_fn, preads_fofn_fn, genome_length, length_cutoff, pre_assembly_report_fn)
     script_fn = 'run-report-pre-assembly.sh'
@@ -35,12 +41,8 @@ def parse_args(argv):
         formatter_class=HelpF,
     )
     parser.add_argument(
-        '--genome-length', type=int,
-        help='Estimated length of genome, for statistical calculations.',
-    )
-    parser.add_argument(
-        '--length-cutoff-user', default=-1,
-        help='User-specified length-cutoff for raw reads; if -1, then we use the calculated value from length-cutoff-fn',
+        '--config-fn',
+        help='Input. JSON configuration. We use "length_cutoff" (if positive) and "genome_size".',
     )
     parser.add_argument(
         '--length-cutoff-fn',
