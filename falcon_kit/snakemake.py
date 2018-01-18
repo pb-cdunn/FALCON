@@ -43,8 +43,10 @@ class SnakemakeRuleWriter(object):
 
         # snakemake cannot use already-generated files as dynamic outputs (the wildcard_inputs for the parallel task),
         # so we rename them and plan to symlink.
-        wildcard_inputs = dict(wildcard_inputs) # since we will modify
-        for key in wildcard_inputs:
+        for key, fn in wildcard_inputs.items():
+            if '{' not in fn:
+                del wildcard_inputs[key]
+                continue
             dn, bn = os.path.split(wildcard_inputs[key])
             wildcard_inputs[key] = os.path.join(dn + '.symlink', bn)
         rule_name = self.unique_rule_name(rule_name)
