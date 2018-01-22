@@ -49,10 +49,10 @@ def gen_parallel_tasks(
     rule_writer.write_dynamic_rules(
             rule_name="foo",
             input_json=scattered_fn,
-            inputs=run_dict['inputs'],
+            inputs=dict_rel_paths(run_dict['inputs']),
             shell_template=run_dict['script'],
             parameters=run_dict['parameters'],
-            wildcard_outputs=run_dict['outputs'],
+            wildcard_outputs=dict_rel_paths(run_dict['outputs']),
             output_json=gathered_fn,
     )
 
@@ -93,3 +93,7 @@ def gen_parallel_tasks(
         },
         parameters={},
     ))
+
+
+def dict_rel_paths(dict_paths):
+    return {k: os.path.relpath(v) for k,v in dict_paths.iteritems()}

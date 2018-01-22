@@ -84,7 +84,7 @@ rule dynamic_foo_split:
     shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} las="0-rawreads/cns-scatter/{{cns_id}}.symlink/merged.{{cns_id2}}.las"'
 
 rule static_0_rawreads_consensus__cns_id_:
-    input:  config='/Users/cdunn2001/repo/gh/FALCON-integrate/FALCON-examples/run/synth0/config.json', db='/Users/cdunn2001/repo/gh/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads/raw_reads.db', las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las', length_cutoff='/Users/cdunn2001/repo/gh/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads/length_cutoff'
+    input:  config='config.json', db='0-rawreads/raw_reads.db', las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las', length_cutoff='0-rawreads/length_cutoff'
     output: fasta='0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta'
     params:
         cns_id="{cns_id}",
@@ -191,8 +191,8 @@ date
 
 rule dynamic_foo1_split:
     input:  '1-preads_ovl/daligner-scatter/scattered.json'
-    output: daligner_script=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh'), daligner_settings=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json')
-    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} daligner_script="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/daligner-script.sh" daligner_settings="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/settings.json"'
+    output: daligner_settings=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json'), daligner_script=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh')
+    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} daligner_settings="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/settings.json" daligner_script="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/daligner-script.sh"'
 
 rule static_1_preads_ovl__job_id_:
     input:  daligner_script='1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh', daligner_settings='1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json'
@@ -265,9 +265,9 @@ date
 rule dynamic_foo2_split:
     input:  '1-preads_ovl/merge-scatter/scattered.json'
     output: las_paths=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/las_paths.json'), merged_las_json=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/merged_las.json'), merge_script=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/merge-script.sh')
-    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} las_paths="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/las_paths.json" merged_las_json="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merged_las.json" merge_script="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merge-script.sh"'
+    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} las_paths="1-preads_ovl/merge-scripts/{{job_id}}.symlink/las_paths.json" merged_las_json="1-preads_ovl/merge-scripts/{{job_id}}.symlink/merged_las.json" merge_script="1-preads_ovl/merge-scripts/{{job_id}}.symlink/merge-script.sh"'
 
-rule static___1_preads_ovl__job_id_:
+rule static_1_preads_ovl__job_id_1:
     input:  las_paths='1-preads_ovl/merge-scripts/{job_id}.symlink/las_paths.json', merge_script='1-preads_ovl/merge-scripts/{job_id}.symlink/merge-script.sh', merged_las_json='1-preads_ovl/merge-scripts/{job_id}.symlink/merged_las.json'
     output: job_done='1-preads_ovl/{job_id}/merge.done', merged_las='1-preads_ovl/{job_id}/merged.las'
     params:
