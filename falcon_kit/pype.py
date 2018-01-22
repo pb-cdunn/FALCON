@@ -49,7 +49,7 @@ def gen_parallel_tasks(
     rule_writer.write_dynamic_rules(
             rule_name="foo",
             input_json=scattered_fn,
-            wildcard_inputs=run_dict['inputs'],
+            inputs=run_dict['inputs'],
             shell_template=run_dict['script'],
             parameters=run_dict['parameters'],
             wildcard_outputs=run_dict['outputs'],

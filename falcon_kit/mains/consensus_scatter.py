@@ -57,7 +57,7 @@ def run(las_fopfn_fn, db_fn, length_cutoff_fn, config_fn, scattered_fn):
         )
         job['params'] = dict(
         )
-        job['wildcards'] = {'cns_id': cns_id} # This should match the wildcard used in the pattern elsewhere.
+        job['wildcards'] = {'cns_id': cns_id, 'cns_id2': cns_id} # This should match the wildcard used in the pattern elsewhere.
         jobs.append(job)
 
     io.serialize(scattered_fn, jobs)

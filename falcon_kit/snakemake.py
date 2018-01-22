@@ -27,14 +27,15 @@ class SnakemakeRuleWriter(object):
                 i += 1
         self.rule_names.add(rule_name)
         return rule_name
-    def write_dynamic_rules(self, rule_name, input_json, wildcard_inputs, shell_template, parameters, wildcard_outputs, output_json):
+    def write_dynamic_rules(self, rule_name, input_json, inputs, shell_template,
+            parameters, wildcard_outputs, output_json):
         """Lots of conventions.
         input_json: should have a key 'mapped_inputs', which is a map of key->filename
           Those filenames will be symlinked here, according to the patterns in wildcard_inputs.
         shell_template: for the parallel task
         output_json: This will contain only key->filename, based on wildcard_outputs.
-        (For now, we assume wildcard_inputs/outputs is just one per parallel task.)
-        (We also assume that only {key} is used as a wildcard.)
+        inputs: These include non-wildcards too.
+        (For now, we assume inputs/outputs is just one per parallel task.)
         """
         # snakemake does not like paths starting with './'; they can lead to mismatches.
         # So we run normpath everywhere.
@@ -43,9 +44,12 @@ class SnakemakeRuleWriter(object):
 
         # snakemake cannot use already-generated files as dynamic outputs (the wildcard_inputs for the parallel task),
         # so we rename them and plan to symlink.
+        wildcard_inputs = dict(inputs)
+        nonwildcard_inputs = dict()
         for key, fn in wildcard_inputs.items():
             if '{' not in fn:
                 del wildcard_inputs[key]
+                nonwildcard_inputs[key] = fn
                 continue
             dn, bn = os.path.split(wildcard_inputs[key])
             wildcard_inputs[key] = os.path.join(dn + '.symlink', bn)
@@ -77,7 +81,10 @@ rule dynamic_%(rule_name)s_split:
         wildcards = list(sorted(input_wildcards))
         params_plus_wildcards = {k: '{%s}'%k for k in wildcards}
         params_plus_wildcards.update(parameters)
-        self.write_script_rule(wildcard_inputs, wildcard_outputs, params_plus_wildcards, shell_template, rule_name=None)
+        # The parallel script uses all inputs, not just wildcards.
+        all_inputs = dict(wildcard_inputs)
+        all_inputs.update(nonwildcard_inputs)
+        self.write_script_rule(all_inputs, wildcard_outputs, params_plus_wildcards, shell_template, rule_name=None)
 
         wo_str_lists_list = ['%s=[str(i) for i in input.%s]' %(name, name) for name in wildcard_outputs.keys()]
         wo_pattern_kv_list = ['%s="%s"' %(name, os.path.normpath(patt)) for (name, patt) in wildcard_outputs.items()]
@@ -117,8 +124,10 @@ rule dynamic_%(rule_name)s_merge:
         rule_name = self.unique_rule_name(self.legalize(rule_name))
         wildcard_rundir = os.path.normpath(os.path.dirname(first_output_fn)) # unsubstituted
         # We use snake_string_path b/c normpath drops leading ./, but we do NOT want abspath.
-        input_kvs = ', '.join('%s=%s'%(k, snake_string_path(v)) for k,v in inputs.iteritems())
-        output_kvs = ', '.join('%s=%s'%(k, snake_string_path(v)) for k,v in outputs.iteritems())
+        input_kvs = ', '.join('%s=%s'%(k, snake_string_path(v)) for k,v in
+                sorted(inputs.iteritems()))
+        output_kvs = ', '.join('%s=%s'%(k, snake_string_path(v)) for k,v in
+                sorted(outputs.iteritems()))
         rule_parameters = {k: v for k,v in parameters.iteritems() if not k.startswith('_')}
         #rule_parameters['reltopdir'] = os.path.relpath('.', wildcard_rundir) # in case we need this later
         params = ','.join('\n        %s="%s"'%(k,v) for k,v in rule_parameters.iteritems())

@@ -19,7 +19,7 @@ def run(gathered_fn, preads_fofn_fn):
     gathered = io.deserialize(gathered_fn)
     fasta_fns = dict()
     for key, desc in gathered.items():
-        job_id = key.split('=')[1]
+        job_id = key.split(',')[0].split('=')[1]
         p_id = convert_job_id_to_p_id(job_id)
         fasta_fns[p_id] = desc['fns']['fasta']
     with open(preads_fofn_fn,  'w') as f:

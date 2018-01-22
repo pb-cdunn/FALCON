@@ -62,7 +62,7 @@ pwd
 ''')
 
 rule static_0_rawreads_cns_scatter:
-    input:  raw_reads_db='0-rawreads/raw_reads.db', las_fopfn='0-rawreads/merge-gather/las.fopfn', config='config.json', length_cutoff='0-rawreads/length_cutoff'
+    input:  config='config.json', las_fopfn='0-rawreads/merge-gather/las.fopfn', length_cutoff='0-rawreads/length_cutoff', raw_reads_db='0-rawreads/raw_reads.db'
     output: scattered='0-rawreads/cns-scatter/scattered.json'
     params:
         topdir="../.."
@@ -84,7 +84,7 @@ rule dynamic_foo_split:
     shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} las="0-rawreads/cns-scatter/{{cns_id}}.symlink/merged.{{cns_id2}}.las"'
 
 rule static_0_rawreads_consensus__cns_id_:
-    input:  las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las'
+    input:  config='/Users/cdunn2001/repo/gh/FALCON-integrate/FALCON-examples/run/synth0/config.json', db='/Users/cdunn2001/repo/gh/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads/raw_reads.db', las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las', length_cutoff='/Users/cdunn2001/repo/gh/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads/length_cutoff'
     output: fasta='0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta'
     params:
         cns_id="{cns_id}",
@@ -133,7 +133,7 @@ date
 '''
 
 rule static_0_rawreads_report:
-    input:  length_cutoff='0-rawreads/length_cutoff', preads_fofn='0-rawreads/preads/input_preads.fofn', config='config.json', raw_reads_db='0-rawreads/raw_reads.db'
+    input:  config='config.json', length_cutoff='0-rawreads/length_cutoff', preads_fofn='0-rawreads/preads/input_preads.fofn', raw_reads_db='0-rawreads/raw_reads.db'
     output: pre_assembly_report='0-rawreads/report/pre_assembly_stats.json'
     params:
         length_cutoff_user="-1",
@@ -153,7 +153,7 @@ date
 
 rule static_1_preads_ovl:
     input:  config='config.json', preads_fofn='0-rawreads/preads/input_preads.fofn'
-    output: run_jobs='1-preads_ovl/run_jobs.sh', preads_db='1-preads_ovl/preads.db', db_build_done='1-preads_ovl/pdb_build_done'
+    output: db_build_done='1-preads_ovl/pdb_build_done', preads_db='1-preads_ovl/preads.db', run_jobs='1-preads_ovl/run_jobs.sh'
     params:
         topdir=".."
     shell:
@@ -171,7 +171,7 @@ date
 '''
 
 rule static_1_preads_ovl_daligner_scatter:
-    input:  run_jobs='1-preads_ovl/run_jobs.sh', preads_db='1-preads_ovl/preads.db'
+    input:  preads_db='1-preads_ovl/preads.db', run_jobs='1-preads_ovl/run_jobs.sh'
     output: scattered='1-preads_ovl/daligner-scatter/scattered.json'
     params:
         db_prefix="preads",
@@ -191,11 +191,11 @@ date
 
 rule dynamic_foo1_split:
     input:  '1-preads_ovl/daligner-scatter/scattered.json'
-    output: daligner_settings=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json'), daligner_script=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh')
-    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} daligner_settings="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/settings.json" daligner_script="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/daligner-script.sh"'
+    output: daligner_script=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh'), daligner_settings=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json')
+    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} daligner_script="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/daligner-script.sh" daligner_settings="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/settings.json"'
 
 rule static_1_preads_ovl__job_id_:
-    input:  daligner_settings='1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json', daligner_script='1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh'
+    input:  daligner_script='1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh', daligner_settings='1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json'
     output: job_done='1-preads_ovl/{job_id}/daligner.done'
     params:
         job_id="{job_id}"
@@ -244,7 +244,7 @@ date
 '''
 
 rule static_1_preads_ovl_merge_scatter:
-    input:  run_jobs='1-preads_ovl/run_jobs.sh', p_gathered_las='1-preads_ovl/daligner-intermediate-gathered-las/gathered-las.txt'
+    input:  p_gathered_las='1-preads_ovl/daligner-intermediate-gathered-las/gathered-las.txt', run_jobs='1-preads_ovl/run_jobs.sh'
     output: scattered='1-preads_ovl/merge-scatter/scattered.json'
     params:
         db_prefix="preads",
@@ -268,7 +268,7 @@ rule dynamic_foo2_split:
     shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} las_paths="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/las_paths.json" merged_las_json="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merged_las.json" merge_script="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merge-script.sh"'
 
 rule static___1_preads_ovl__job_id_:
-    input:  las_paths='1-preads_ovl/merge-scripts/{job_id}.symlink/las_paths.json', merged_las_json='1-preads_ovl/merge-scripts/{job_id}.symlink/merged_las.json', merge_script='1-preads_ovl/merge-scripts/{job_id}.symlink/merge-script.sh'
+    input:  las_paths='1-preads_ovl/merge-scripts/{job_id}.symlink/las_paths.json', merge_script='1-preads_ovl/merge-scripts/{job_id}.symlink/merge-script.sh', merged_las_json='1-preads_ovl/merge-scripts/{job_id}.symlink/merged_las.json'
     output: job_done='1-preads_ovl/{job_id}/merge.done', merged_las='1-preads_ovl/{job_id}/merged.las'
     params:
         job_id="{job_id}"
@@ -303,7 +303,7 @@ rule dynamic_foo2_merge:
 
 rule static_1_preads_ovl_merged_las_fofn:
     input:  gathered='1-preads_ovl/merge-gathered/gathered.json'
-    output: las_fopfn='1-preads_ovl/merged-las-fofn/las.fopfn', las_fofn='1-preads_ovl/merged-las-fofn/las.fofn'
+    output: las_fofn='1-preads_ovl/merged-las-fofn/las.fofn', las_fopfn='1-preads_ovl/merged-las-fofn/las.fopfn'
     params:
         topdir="../.."
     shell:
@@ -319,7 +319,7 @@ date
 '''
 
 rule static_1_preads_ovl_db2falcon:
-    input:  preads_db='1-preads_ovl/preads.db', las_fofn='1-preads_ovl/merged-las-fofn/las.fofn'
+    input:  las_fofn='1-preads_ovl/merged-las-fofn/las.fofn', preads_db='1-preads_ovl/preads.db'
     output: job_done='1-preads_ovl/db2falcon/db2falcon_done', preads4falcon='1-preads_ovl/db2falcon/preads4falcon.fasta'
     params:
         topdir="../.."
