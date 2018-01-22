@@ -9,11 +9,11 @@ from .. import run_support
 
 LOG = logging.getLogger()
 
-def run(db_prefix, pread_aln, skip_checks, run_jobs_fn, preads_db_fn, scattered_fn):
-    nblock = run_support.get_nblock(preads_db_fn)
+def run(db_prefix, pread_aln, skip_checks, run_jobs_fn, db_fn, stage, scattered_fn):
+    nblock = run_support.get_nblock(db_fn)
 
     db_build_done_fn = None
-    daligner_scripts = bash.scripts_daligner(run_jobs_fn, db_prefix, db_build_done_fn, nblock=nblock, pread_aln=pread_aln, skip_check=skip_checks)
+    daligner_scripts = bash.scripts_daligner(run_jobs_fn, db_prefix, db_build_done_fn, nblock=nblock, pread_aln=bool(pread_aln), skip_check=skip_checks)
     basedir = os.path.dirname(os.path.abspath(scattered_fn))
     rootdir = os.path.dirname(os.path.dirname(basedir)) # for now
     jobs = list()
@@ -22,8 +22,8 @@ def run(db_prefix, pread_aln, skip_checks, run_jobs_fn, preads_db_fn, scattered_
         daligner_settings = dict(db_prefix=db_prefix)
 
         # Write the scattered inputs.
-        daligner_script_fn = '{rootdir}/1-preads_ovl/daligner-scripts/{job_id}/daligner-script.sh'.format(**locals())
-        daligner_settings_fn = '{rootdir}/1-preads_ovl/daligner-scripts/{job_id}/settings.json'.format(**locals())
+        daligner_script_fn = '{rootdir}/{stage}/daligner-scripts/{job_id}/daligner-script.sh'.format(**locals())
+        daligner_settings_fn = '{rootdir}/{stage}/daligner-scripts/{job_id}/settings.json'.format(**locals())
         io.mkdirs(os.path.dirname(daligner_script_fn))
         with open(daligner_script_fn, 'w') as stream:
             stream.write(script)
@@ -36,7 +36,7 @@ def run(db_prefix, pread_aln, skip_checks, run_jobs_fn, preads_db_fn, scattered_
                 daligner_settings = daligner_settings_fn, # not used today, but maybe someday
         )
         job['output'] = dict(
-                job_done = '{rootdir}/1-preads_ovl/daligner/{job_id}/daligner.done'.format(**locals()),
+                job_done = '{rootdir}/{stage}/daligner/{job_id}/daligner.done'.format(**locals()),
         )
         job['params'] = dict(
         )
@@ -62,7 +62,7 @@ def parse_args(argv):
         help='Input. Result of HPC.daligner.',
     )
     parser.add_argument(
-        '--db-prefix', default='preads',
+        '--db-prefix', default='raw_reads',
         help='Either preads or raw_reads.',
     )
     parser.add_argument(
@@ -70,12 +70,16 @@ def parse_args(argv):
         help='Skip LAcheck calls after daligner. (0 => do not skip)',
     )
     parser.add_argument(
-        '--preads-db-fn',
-        help='Dazzler DB of preads. (Used to calculate number of blocks.)',
+        '--db-fn',
+        help='Dazzler DB of reads. (Used to calculate number of blocks.)',
     )
     parser.add_argument(
-        '--pread-aln', action='store_true',
-        help='Pread alignment mode. (Run daligner_p instead of daligner.)',
+        '--pread-aln', default=0,
+        help='If non-zero, use pread alignment mode. (Run daligner_p instead of daligner.)',
+    )
+    parser.add_argument(
+        '--stage', default='0-rawreads',
+        help='Either 0-rawreads or 1-preads_ovl, for now.',
     )
     parser.add_argument(
         '--scattered-fn',

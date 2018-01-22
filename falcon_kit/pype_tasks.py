@@ -242,7 +242,7 @@ def read_gathered_las(path):
     return result
 
 TASK_LAS_MERGE_SCATTER_SCRIPT = """\
-python -m falcon_kit.mains.las_merge_scatter --db-prefix={params.db_prefix} --stage={params.stage} --run-jobs-fn={input.run_jobs} --p-gathered-las-fn={input.p_gathered_las} --scattered-fn={output.scattered}
+python -m falcon_kit.mains.las_merge_scatter --db-prefix={params.db_prefix} --stage={params.stage} --run-jobs-fn={input.run_jobs} --gathered-las-fn={input.gathered_las} --scattered-fn={output.scattered}
 """
 def task_merge_scatter(self):
     run_jobs_fn = self.run_jobs
@@ -386,7 +386,7 @@ python -m falcon_kit.mains.build_pdb --input-fofn-fn={input.preads_fofn} --confi
 touch {output.db_build_done}
 """
 TASK_DALIGNER_SCATTER_SCRIPT = """\
-python -m falcon_kit.mains.daligner_scatter --run-jobs-fn={input.run_jobs} --db-prefix={params.db_prefix} --preads-db-fn={input.preads_db} --skip-checks={params.skip_checks} --pread-aln --scattered-fn={output.scattered}
+python -m falcon_kit.mains.daligner_scatter --run-jobs-fn={input.run_jobs} --db-prefix={params.db_prefix} --db-fn={input.db} --skip-checks={params.skip_checks} --pread-aln={params.pread_aln} --stage={params.stage} --scattered-fn={output.scattered}
 """
 TASK_DALIGNER_SCRIPT = """\
 # Note: HPC.daligner chooses a merged filename in its generated script, so we will symlink to it.

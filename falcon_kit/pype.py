@@ -6,6 +6,9 @@ from pypeflow.sample_tasks import gen_task as pype_gen_task
 from . import io
 import os
 
+import logging
+LOG = logging.getLogger(__name__)
+
 TASK_GENERIC_GATHER_SCRIPT = """
 python -m falcon_kit.mains.generic_gather --scattered-fn={input.scattered} --gathered-fn={output.gathered}
 """
@@ -69,6 +72,7 @@ def gen_parallel_tasks(
         outputs = job['output']
         params = job['params']
         params.update({k: v for k,v in job['wildcards'].items()}) # include expanded wildcards
+        LOG.warning('OUT:{}'.format(outputs))
         wf.addTask(pype_gen_task(
                 script=run_dict['script'],
                 inputs=inputs,

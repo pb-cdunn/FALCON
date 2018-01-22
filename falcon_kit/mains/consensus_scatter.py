@@ -8,17 +8,25 @@ from .. import bash
 
 LOG = logging.getLogger()
 
+def corrected_relpath(p, was_rel_to):
+    if os.path.isabs(p):
+        return p
+    #LOG.warning('{},{},{}'.format(p, was_rel_to, os.path.relpath(os.path.join(was_rel_to, p))))
+    return os.path.normpath(os.path.relpath(os.path.join(was_rel_to, p)))
+
 def read_gathered_las(path):
     """Return dict of block->[las_paths].
     For now, these are ws separated on each line of input.
     """
     result = collections.defaultdict(list)
+    dn = os.path.normpath(os.path.dirname(path))
     with open(path) as ifs:
         for line in ifs:
             block, las_path = line.split()
-            result[int(block)].append(las_path)
-    # LOG.warning('path={!r}, result={}'.format(
-    #    path, pprint.pformat(result)))
+            result[int(block)].append(corrected_relpath(las_path, dn))
+    #import pprint
+    #LOG.warning('path={!r}, result={}'.format(
+    #   path, pprint.pformat(result)))
     return result
 
 
@@ -41,7 +49,9 @@ def run(las_fopfn_fn, db_fn, length_cutoff_fn, config_fn, scattered_fn):
         #out_file_fn = '%s.fasta' % cns_label
         symlinked_las_fn = '{rootdir}/0-rawreads/cns-scatter/{cns_id}/merged.{cns_id2}.las'.format(**locals())
         io.mkdirs(os.path.normpath(os.path.dirname(symlinked_las_fn)))
-        io.symlink(las_fn, symlinked_las_fn)
+        src = os.path.relpath(las_fn,
+            os.path.normpath(os.path.dirname(symlinked_las_fn)))
+        io.symlink(src, symlinked_las_fn)
 
         # Record in a job-dict.
         job = dict()

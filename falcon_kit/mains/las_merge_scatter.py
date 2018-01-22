@@ -21,13 +21,13 @@ def read_gathered_las(path):
     #    path, pprint.pformat(result)))
     return result
 
-def run(run_jobs_fn, p_gathered_las_fn, db_prefix, stage, scattered_fn):
+def run(run_jobs_fn, gathered_las_fn, db_prefix, stage, scattered_fn):
     LOG.info('Scattering las from {!r} (based on {!r}) into {!r}.'.format(
-        p_gathered_las_fn, run_jobs_fn, scattered_fn))
+        gathered_las_fn, run_jobs_fn, scattered_fn))
     config = dict() # not used anyway
     merge_scripts = list(bash.scripts_merge(config, db_prefix, run_jobs_fn))
-    gathered_dict = read_gathered_las(p_gathered_las_fn)
-    gathered_dict_dir = os.path.normpath(os.path.dirname(p_gathered_las_fn))
+    gathered_dict = read_gathered_las(gathered_las_fn)
+    gathered_dict_dir = os.path.normpath(os.path.dirname(gathered_las_fn))
 
     basedir = os.path.dirname(os.path.abspath(scattered_fn))
     rootdir = os.path.dirname(os.path.dirname(basedir)) # for now
@@ -87,16 +87,16 @@ def parse_args(argv):
         help='Input. Result of HPC.daligner.',
     )
     parser.add_argument(
-        '--p-gathered-las-fn',
+        '--gathered-las-fn',
         help='Input. (Not sure of content yet.)',
     )
     parser.add_argument(
         '--db-prefix', default='raw_reads',
-        help='Input. Either preads or raw_reads.',
+        help='Either preads or raw_reads.',
     )
     parser.add_argument(
         '--stage', default='0-rawreads',
-        help='Input. Either 0-rawreads or 1-preads_ovl, for now.',
+        help='Either 0-rawreads or 1-preads_ovl, for now.',
     )
     # Do we need config too?
     parser.add_argument(
