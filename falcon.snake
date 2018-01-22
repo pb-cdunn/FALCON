@@ -80,11 +80,11 @@ date
 
 rule dynamic_foo_split:
     input:  '0-rawreads/cns-scatter/scattered.json'
-    output: db=dynamic('/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/raw_reads.db'), length_cutoff=dynamic('/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/length_cutoff'), config=dynamic('/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0.symlink/config.json'), las=dynamic('0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las')
-    shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} db="/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/raw_reads.db" length_cutoff="/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/length_cutoff" config="/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0.symlink/config.json" las="0-rawreads/cns-scatter/{{cns_id}}.symlink/merged.{{cns_id2}}.las"'
+    output: las=dynamic('0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las')
+    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} las="0-rawreads/cns-scatter/{{cns_id}}.symlink/merged.{{cns_id2}}.las"'
 
 rule static_0_rawreads_consensus__cns_id_:
-    input:  db='/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/raw_reads.db', length_cutoff='/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0/0-rawreads.symlink/length_cutoff', config='/localdisk/scratch/cdunn/FALCON-integrate/FALCON-examples/run/synth0.symlink/config.json', las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las'
+    input:  las='0-rawreads/cns-scatter/{cns_id}.symlink/merged.{cns_id2}.las'
     output: fasta='0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta'
     params:
         cns_id="{cns_id}",
@@ -192,7 +192,7 @@ date
 rule dynamic_foo1_split:
     input:  '1-preads_ovl/daligner-scatter/scattered.json'
     output: daligner_settings_fn=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json'), daligner_script_fn=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh')
-    shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} daligner_settings_fn="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/settings.json" daligner_script_fn="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/daligner-script.sh"'
+    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} daligner_settings_fn="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/settings.json" daligner_script_fn="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/daligner-script.sh"'
 
 rule static_1_preads_ovl__job_id_:
     input:  daligner_settings_fn='1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json', daligner_script_fn='1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh'
@@ -265,7 +265,7 @@ date
 rule dynamic_foo2_split:
     input:  '1-preads_ovl/merge-scatter/scattered.json'
     output: las_paths=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/las_paths.json'), merged_las_json=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/merged_las.json'), merge_script=dynamic('1-preads_ovl/merge-scripts/{job_id}.symlink/merge-script.sh')
-    shell: 'python -m falcon_unzip.mains.symlink_mapped --special-split={input} las_paths="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/las_paths.json" merged_las_json="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merged_las.json" merge_script="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merge-script.sh"'
+    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} las_paths="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/las_paths.json" merged_las_json="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merged_las.json" merge_script="./1-preads_ovl/merge-scripts/{{job_id}}.symlink/merge-script.sh"'
 
 rule static___1_preads_ovl__job_id_:
     input:  las_paths='1-preads_ovl/merge-scripts/{job_id}.symlink/las_paths.json', merged_las_json='1-preads_ovl/merge-scripts/{job_id}.symlink/merged_las.json', merge_script='1-preads_ovl/merge-scripts/{job_id}.symlink/merge-script.sh'
