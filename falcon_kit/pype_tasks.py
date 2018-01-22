@@ -59,10 +59,9 @@ def task_build_rdb(self):
     db = fn(self.raw_reads_db)
     run_jobs = fn(self.run_jobs)
     remove(job_done, db, run_jobs)
-    work_dir = self.parameters['work_dir']
     config = self.parameters['config']
 
-    script_fn = os.path.join(work_dir, 'prepare_rdb.sh')
+    script_fn = 'prepare_rdb.sh'
     args = {
         'input_fofn_fn': input_fofn_fn,
         'config': config,
@@ -81,10 +80,9 @@ def task_build_pdb(self):
     db = fn(self.preads_db)
     run_jobs = fn(self.run_jobs)
     remove(job_done, db, run_jobs)
-    work_dir = self.parameters['work_dir']
     config = self.parameters['config']
 
-    script_fn = os.path.join(work_dir, 'prepare_pdb.sh')
+    script_fn = 'prepare_pdb.sh'
     args = {
         'input_fofn_fn': input_fofn_fn,
         'config': config,
