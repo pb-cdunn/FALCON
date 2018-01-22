@@ -271,32 +271,54 @@ def run(wf, config, rule_writer,
 
         # Merge .las files.
         wf.max_jobs = config['la_concurrent_jobs']
-        scattered_fn = os.path.join(
-            rawread_dir, 'merge-scatter', 'scattered.json')
-        make_task = PypeTask(
+        scattered_fn = os.path.join(rawread_dir, 'merge-scatter', 'scattered.json')
+        params = dict(parameters)
+        params['db_prefix'] = 'raw_reads'
+        params['stage'] = os.path.basename(rawread_dir) # TODO(CD): Make this more clearly constant.
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_LAS_MERGE_SCATTER_SCRIPT,
             inputs={
-                'run_jobs': run_jobs,
-                'gathered_las': r_gathered_las_plf,
+                'run_jobs': fn(run_jobs),
+                'p_gathered_las': fn(r_gathered_las_plf),
             },
             outputs={
                 'scattered': scattered_fn,
             },
-            parameters={
-                'db_prefix': 'raw_reads',
-                'config': config,
-            },
-        )
-        task = make_task(pype_tasks.task_merge_scatter)
-        wf.addTask(task)
-        wf.refreshTargets(exitOnFailure=exitOnFailure)
+            parameters=params,
+            rule_writer=rule_writer,
+        ))
 
-        merge_tasks, p_ids_merged_las = create_merge_tasks(
-            rawread_dir, scattered_fn)
-        wf.addTasks(merge_tasks)
-        task, _, las_fopfn_plf = create_merge_gather_task(
-            os.path.join(rawread_dir, 'merge-gather'), p_ids_merged_las)
-        wf.addTask(task)
-        wf.refreshTargets(exitOnFailure=exitOnFailure)
+        gathered_fn = os.path.join(rawread_dir, 'merge-gathered', 'gathered.json')
+        gen_parallel_tasks(
+            wf, rule_writer,
+            scattered_fn, gathered_fn,
+            run_dict=dict(
+                script=pype_tasks.TASK_LAS_MERGE_SCRIPT,
+                inputs={
+                    'las_paths': './0-rawreads/merge-scripts/{job_id}/las_paths.json',
+                    'merge_script': './0-rawreads/merge-scripts/{job_id}/merge-script.sh',
+                    'merged_las_json': './0-rawreads/merge-scripts/{job_id}/merged_las.json',
+                },
+                outputs={
+                    'merged_las': './0-rawreads/{job_id}/merged.las',
+                    'job_done': './0-rawreads/{job_id}/merge.done',
+                },
+                parameters={},
+            ),
+        )
+
+        las_fofn_fn = os.path.join(rawread_dir, 'merged-las-fofn', 'las.fofn')
+        las_fopfn_fn = os.path.join(rawread_dir, 'merged-las-fofn', 'las.fopfn')
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_LAS_MERGE_GATHER_SCRIPT,
+            inputs={'gathered': gathered_fn,
+            },
+            outputs={'las_fofn': las_fofn_fn,
+                     'las_fopfn': las_fopfn_fn,
+            },
+            parameters={},
+            rule_writer=rule_writer,
+        ))
 
         if config['target'] == 'overlapping':
             sys.exit(0)
@@ -309,7 +331,7 @@ def run(wf, config, rule_writer,
         wf.addTask(gen_task(
             script=pype_tasks.TASK_CONSENSUS_SCATTER_SCRIPT,
             inputs={
-                'las_fopfn': fn(las_fopfn_plf),
+                'las_fopfn': las_fopfn_fn,
                 'raw_reads_db': fn(raw_reads_db_plf),
                 'length_cutoff': fn(length_cutoff_plf),
                 'config': general_config_fn,
