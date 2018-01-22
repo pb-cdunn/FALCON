@@ -191,11 +191,11 @@ date
 
 rule dynamic_foo1_split:
     input:  '1-preads_ovl/daligner-scatter/scattered.json'
-    output: daligner_settings_fn=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json'), daligner_script_fn=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh')
-    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} daligner_settings_fn="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/settings.json" daligner_script_fn="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/daligner-script.sh"'
+    output: daligner_settings=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json'), daligner_script=dynamic('1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh')
+    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} daligner_settings="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/settings.json" daligner_script="1-preads_ovl/daligner-scripts/{{job_id}}.symlink/daligner-script.sh"'
 
 rule static_1_preads_ovl__job_id_:
-    input:  daligner_settings_fn='1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json', daligner_script_fn='1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh'
+    input:  daligner_settings='1-preads_ovl/daligner-scripts/{job_id}.symlink/settings.json', daligner_script='1-preads_ovl/daligner-scripts/{job_id}.symlink/daligner-script.sh'
     output: job_done='1-preads_ovl/{job_id}/daligner.done'
     params:
         job_id="{job_id}"

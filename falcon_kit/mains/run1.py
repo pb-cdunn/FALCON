@@ -445,8 +445,8 @@ def run(wf, config, rule_writer,
         run_dict=dict(
             script=pype_tasks.TASK_DALIGNER_SCRIPT,
             inputs={
-                'daligner_script_fn': '1-preads_ovl/daligner-scripts/{job_id}/daligner-script.sh',
-                'daligner_settings_fn': '1-preads_ovl/daligner-scripts/{job_id}/settings.json',
+                'daligner_script': '1-preads_ovl/daligner-scripts/{job_id}/daligner-script.sh',
+                'daligner_settings': '1-preads_ovl/daligner-scripts/{job_id}/settings.json',
             },
             outputs={
                 'job_done': '1-preads_ovl/{job_id}/daligner.done',
