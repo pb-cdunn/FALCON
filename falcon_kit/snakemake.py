@@ -70,7 +70,7 @@ class SnakemakeRuleWriter(object):
 rule dynamic_%(rule_name)s_split:
     input:  %(input_json)r
     output: %(dynamic_output_kvs)s
-    shell: 'python -m falcon_kit.mains.symlink_mapped --special-split={input} %(wi_pattern_kvs)s'
+    shell: 'python -m falcon_kit.mains.copy_mapped --special-split={input} %(wi_pattern_kvs)s'
 """%(locals())
         self.write(rule)
 
