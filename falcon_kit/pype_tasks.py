@@ -242,7 +242,7 @@ def read_gathered_las(path):
     return result
 
 TASK_LAS_MERGE_SCATTER_SCRIPT = """\
-python -m falcon_kit.mains.las_merge_scatter --db-prefix={params.db_prefix} --stage={params.stage} --run-jobs-fn={input.run_jobs} --gathered-las-fn={input.gathered_las} --scattered-fn={output.scattered}
+python -m falcon_kit.mains.las_merge_scatter --db-prefix={params.db_prefix} --stage={params.stage} --run-jobs-fn={input.run_jobs} --gathered-las-fn={input.gathered_las} --wildcards={params.wildcards} --scattered-fn={output.scattered}
 """
 def task_merge_scatter(self):
     run_jobs_fn = self.run_jobs
@@ -369,7 +369,7 @@ def task_run_consensus(self):
     self.generated_script_fn = script_fn
 
 TASK_CONSENSUS_SCATTER_SCRIPT = """\
-python -m falcon_kit.mains.consensus_scatter --las-fopfn-fn={input.las_fopfn} --db-fn={input.raw_reads_db} --length-cutoff-fn={input.length_cutoff} --config-fn={input.config} --scattered-fn={output.scattered}
+python -m falcon_kit.mains.consensus_scatter --las-fopfn-fn={input.las_fopfn} --db-fn={input.raw_reads_db} --length-cutoff-fn={input.length_cutoff} --config-fn={input.config} --wildcards={params.wildcards} --scattered-fn={output.scattered}
 """
 TASK_CONSENSUS_TASK_SCRIPT = """\
 python -m falcon_kit.mains.consensus_task --las-fn={input.las} --db-fn={input.db} --length-cutoff-fn={input.length_cutoff} --config-fn={input.config} --fasta-fn={output.fasta}
@@ -390,7 +390,7 @@ python -m falcon_kit.mains.build_pdb --input-fofn-fn={input.preads_fofn} --confi
 touch {output.db_build_done}
 """
 TASK_DALIGNER_SCATTER_SCRIPT = """\
-python -m falcon_kit.mains.daligner_scatter --run-jobs-fn={input.run_jobs} --db-prefix={params.db_prefix} --db-fn={input.db} --skip-checks={params.skip_checks} --pread-aln={params.pread_aln} --stage={params.stage} --scattered-fn={output.scattered}
+python -m falcon_kit.mains.daligner_scatter --run-jobs-fn={input.run_jobs} --db-prefix={params.db_prefix} --db-fn={input.db} --skip-checks={params.skip_checks} --pread-aln={params.pread_aln} --stage={params.stage} --wildcards={params.wildcards} --scattered-fn={output.scattered}
 """
 TASK_DALIGNER_SCRIPT = """\
 # Note: HPC.daligner chooses a merged filename in its generated script, so we will symlink to it.

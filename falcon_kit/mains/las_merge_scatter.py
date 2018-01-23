@@ -21,7 +21,7 @@ def read_gathered_las(path):
     #    path, pprint.pformat(result)))
     return result
 
-def run(run_jobs_fn, gathered_las_fn, db_prefix, stage, scattered_fn):
+def run(run_jobs_fn, gathered_las_fn, db_prefix, stage, wildcards, scattered_fn):
     LOG.info('Scattering las from {!r} (based on {!r}) into {!r}.'.format(
         gathered_las_fn, run_jobs_fn, scattered_fn))
     config = dict() # not used anyway
@@ -64,7 +64,7 @@ def run(run_jobs_fn, gathered_las_fn, db_prefix, stage, scattered_fn):
         job['params'] = dict(
                 actual_merged_las = merged_las_fn,
         )
-        job['wildcards'] = {'job_id': job_id} # This should match the wildcard used in the pattern elsewhere.
+        job['wildcards'] = {wildcards: job_id}
         jobs.append(job)
 
     io.serialize(scattered_fn, jobs)
@@ -97,6 +97,10 @@ def parse_args(argv):
     parser.add_argument(
         '--stage', default='0-rawreads',
         help='Either 0-rawreads or 1-preads_ovl, for now.',
+    )
+    parser.add_argument(
+        '--wildcards',
+        help='To be used in substitutions',
     )
     # Do we need config too?
     parser.add_argument(

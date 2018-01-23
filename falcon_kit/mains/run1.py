@@ -223,6 +223,7 @@ def run(wf, config, rule_writer,
         params['stage'] = os.path.basename(rawread_dir)
         params['pread_aln'] = 0
         params['skip_checks'] = int(config.get('skip_checks', 0))
+        params['wildcards'] = 'dal0_id'
         wf.addTask(gen_task(
             script=pype_tasks.TASK_DALIGNER_SCATTER_SCRIPT,
             inputs={
@@ -243,11 +244,11 @@ def run(wf, config, rule_writer,
             run_dict=dict(
                 script=pype_tasks.TASK_DALIGNER_SCRIPT,
                 inputs={
-                    'daligner_script': '0-rawreads/daligner-scripts/{job_id}/daligner-script.sh',
-                    'daligner_settings': '0-rawreads/daligner-scripts/{job_id}/settings.json',
+                    'daligner_script': '0-rawreads/daligner-scripts/{dal0_id}/daligner-script.sh',
+                    'daligner_settings': '0-rawreads/daligner-scripts/{dal0_id}/settings.json',
                 },
                 outputs={
-                    'job_done': '0-rawreads/{job_id}/daligner.done',
+                    'job_done': '0-rawreads/{dal0_id}/daligner.done',
                 },
                 parameters={},
             ),
@@ -270,6 +271,7 @@ def run(wf, config, rule_writer,
         params = dict() #(parameters)
         params['db_prefix'] = 'raw_reads'
         params['stage'] = os.path.basename(rawread_dir) # TODO(CD): Make this more clearly constant.
+        params['wildcards'] = 'mer0_id'
         wf.addTask(gen_task(
             script=pype_tasks.TASK_LAS_MERGE_SCATTER_SCRIPT,
             inputs={
@@ -290,13 +292,13 @@ def run(wf, config, rule_writer,
             run_dict=dict(
                 script=pype_tasks.TASK_LAS_MERGE_SCRIPT,
                 inputs={
-                    'las_paths': './0-rawreads/merge-scripts/{job_id}/las_paths.json',
-                    'merge_script': './0-rawreads/merge-scripts/{job_id}/merge-script.sh',
-                    'merged_las_json': './0-rawreads/merge-scripts/{job_id}/merged_las.json',
+                    'las_paths': './0-rawreads/merge-scripts/{mer0_id}/las_paths.json',
+                    'merge_script': './0-rawreads/merge-scripts/{mer0_id}/merge-script.sh',
+                    'merged_las_json': './0-rawreads/merge-scripts/{mer0_id}/merged_las.json',
                 },
                 outputs={
-                    'merged_las': './0-rawreads/{job_id}/merged.las',
-                    'job_done': './0-rawreads/{job_id}/merge.done',
+                    'merged_las': './0-rawreads/{mer0_id}/merged.las',
+                    'job_done': './0-rawreads/{mer0_id}/merge.done',
                 },
                 parameters={},
             ),
@@ -323,6 +325,8 @@ def run(wf, config, rule_writer,
 
         scattered_fn = os.path.join(
             rawread_dir, 'cns-scatter', 'scattered.json')
+        params = dict()
+        params['wildcards'] = 'cns0_id,cns0_id2'
         wf.addTask(gen_task(
             script=pype_tasks.TASK_CONSENSUS_SCATTER_SCRIPT,
             inputs={
@@ -334,7 +338,7 @@ def run(wf, config, rule_writer,
             outputs={
                 'scattered': scattered_fn,
             },
-            parameters={},
+            parameters=params,
             rule_writer=rule_writer,
         ))
 
@@ -345,13 +349,13 @@ def run(wf, config, rule_writer,
             run_dict=dict(
                 script=pype_tasks.TASK_CONSENSUS_TASK_SCRIPT,
                 inputs = {
-                    'las': '0-rawreads/cns-scatter/{cns_id}/merged.{cns_id2}.las',
+                    'las': '0-rawreads/cns-scatter/{cns0_id}/merged.{cns0_id2}.las',
                     'db': raw_reads_db_fn,
                     'length_cutoff': length_cutoff_fn,
                     'config': general_config_fn,
                 },
                 outputs = {
-                    'fasta': '0-rawreads/consensus/{cns_id}/consensus.{cns_id2}.fasta',
+                    'fasta': '0-rawreads/consensus/{cns0_id}/consensus.{cns0_id2}.fasta',
                 },
                 parameters={},
             ),
@@ -444,6 +448,7 @@ def run(wf, config, rule_writer,
     params['pread_aln'] = 1
     #params['nblock'] = preads_nblock
     params['skip_checks'] = int(config.get('skip_checks', 0))
+    params['wildcards'] = 'dal1_id'
     wf.addTask(gen_task(
         script=pype_tasks.TASK_DALIGNER_SCATTER_SCRIPT,
         inputs={
@@ -464,11 +469,11 @@ def run(wf, config, rule_writer,
         run_dict=dict(
             script=pype_tasks.TASK_DALIGNER_SCRIPT,
             inputs={
-                'daligner_script': '1-preads_ovl/daligner-scripts/{job_id}/daligner-script.sh',
-                'daligner_settings': '1-preads_ovl/daligner-scripts/{job_id}/settings.json',
+                'daligner_script': '1-preads_ovl/daligner-scripts/{dal1_id}/daligner-script.sh',
+                'daligner_settings': '1-preads_ovl/daligner-scripts/{dal1_id}/settings.json',
             },
             outputs={
-                'job_done': '1-preads_ovl/{job_id}/daligner.done',
+                'job_done': '1-preads_ovl/{dal1_id}/daligner.done',
             },
             parameters={},
         ),
@@ -494,6 +499,7 @@ def run(wf, config, rule_writer,
     params = dict() #(parameters)
     params['db_prefix'] = 'preads'
     params['stage'] = os.path.basename(pread_dir) # TODO(CD): Make this more clearly constant.
+    params['wildcards'] = 'mer1_id'
     wf.addTask(gen_task(
         script=pype_tasks.TASK_LAS_MERGE_SCATTER_SCRIPT,
         inputs={
@@ -514,13 +520,13 @@ def run(wf, config, rule_writer,
         run_dict=dict(
             script=pype_tasks.TASK_LAS_MERGE_SCRIPT,
             inputs={
-                'las_paths': './1-preads_ovl/merge-scripts/{job_id}/las_paths.json',
-                'merge_script': './1-preads_ovl/merge-scripts/{job_id}/merge-script.sh',
-                'merged_las_json': './1-preads_ovl/merge-scripts/{job_id}/merged_las.json',
+                'las_paths': './1-preads_ovl/merge-scripts/{mer1_id}/las_paths.json',
+                'merge_script': './1-preads_ovl/merge-scripts/{mer1_id}/merge-script.sh',
+                'merged_las_json': './1-preads_ovl/merge-scripts/{mer1_id}/merged_las.json',
             },
             outputs={
-                'merged_las': './1-preads_ovl/{job_id}/merged.las',
-                'job_done': './1-preads_ovl/{job_id}/merge.done',
+                'merged_las': './1-preads_ovl/{mer1_id}/merged.las',
+                'job_done': './1-preads_ovl/{mer1_id}/merge.done',
             },
             parameters={},
         ),

@@ -9,7 +9,7 @@ from .. import run_support
 
 LOG = logging.getLogger()
 
-def run(db_prefix, pread_aln, skip_checks, run_jobs_fn, db_fn, stage, scattered_fn):
+def run(db_prefix, pread_aln, skip_checks, run_jobs_fn, db_fn, stage, wildcards, scattered_fn):
     nblock = run_support.get_nblock(db_fn)
 
     db_build_done_fn = None
@@ -40,7 +40,7 @@ def run(db_prefix, pread_aln, skip_checks, run_jobs_fn, db_fn, stage, scattered_
         )
         job['params'] = dict(
         )
-        job['wildcards'] = {'job_id': job_id} # This should match the wildcard used in the pattern elsewhere.
+        job['wildcards'] = {wildcards: job_id}
         jobs.append(job)
 
     io.serialize(scattered_fn, jobs)
@@ -80,6 +80,10 @@ def parse_args(argv):
     parser.add_argument(
         '--stage', default='0-rawreads',
         help='Either 0-rawreads or 1-preads_ovl, for now.',
+    )
+    parser.add_argument(
+        '--wildcards',
+        help='To be used in substitutions',
     )
     parser.add_argument(
         '--scattered-fn',

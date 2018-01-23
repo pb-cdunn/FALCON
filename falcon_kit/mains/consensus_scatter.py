@@ -30,10 +30,11 @@ def read_gathered_las(path):
     return result
 
 
-def run(las_fopfn_fn, db_fn, length_cutoff_fn, config_fn, scattered_fn):
+def run(las_fopfn_fn, db_fn, length_cutoff_fn, config_fn, wildcards, scattered_fn):
     LOG.info('Scattering las from {!r} (based on {!r}) into {!r}.'.format(
         las_fopfn_fn, db_fn, scattered_fn))
 
+    wildcards = wildcards.split(',')
     basedir = os.path.dirname(os.path.abspath(scattered_fn))
     rootdir = os.path.dirname(os.path.dirname(basedir)) # for now
     jobs = list()
@@ -67,7 +68,7 @@ def run(las_fopfn_fn, db_fn, length_cutoff_fn, config_fn, scattered_fn):
         )
         job['params'] = dict(
         )
-        job['wildcards'] = {'cns_id': cns_id, 'cns_id2': cns_id} # This should match the wildcard used in the pattern elsewhere.
+        job['wildcards'] = {wildcards[0]: cns_id, wildcards[1]: cns_id}
         jobs.append(job)
 
     io.serialize(scattered_fn, jobs)
@@ -100,6 +101,10 @@ def parse_args(argv):
     parser.add_argument(
         '--config-fn',
         help='Input. JSON of relevant configuration (currently from General section of full-prog config).',
+    )
+    parser.add_argument(
+        '--wildcards',
+        help='To be used in substitutions',
     )
     parser.add_argument(
         '--scattered-fn',
