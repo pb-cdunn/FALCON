@@ -243,11 +243,11 @@ def run(wf, config, rule_writer,
             run_dict=dict(
                 script=pype_tasks.TASK_DALIGNER_SCRIPT,
                 inputs={
-                    'daligner_script': '0-raw_reads/daligner-scripts/{job_id}/daligner-script.sh',
-                    'daligner_settings': '0-raw_reads/daligner-scripts/{job_id}/settings.json',
+                    'daligner_script': '0-rawreads/daligner-scripts/{job_id}/daligner-script.sh',
+                    'daligner_settings': '0-rawreads/daligner-scripts/{job_id}/settings.json',
                 },
                 outputs={
-                    'job_done': '0-raw_reads/{job_id}/daligner.done',
+                    'job_done': '0-rawreads/{job_id}/daligner.done',
                 },
                 parameters={},
             ),

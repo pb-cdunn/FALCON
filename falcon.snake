@@ -102,12 +102,12 @@ date
 
 rule dynamic_foo_split:
     input:  '0-rawreads/daligner-scatter/scattered.json'
-    output: daligner_settings=dynamic('0-raw_reads/daligner-scripts/{job_id}.symlink/settings.json'), daligner_script=dynamic('0-raw_reads/daligner-scripts/{job_id}.symlink/daligner-script.sh')
-    shell: 'python -m falcon_kit.mains.copy_mapped --special-split={input} daligner_settings="0-raw_reads/daligner-scripts/{{job_id}}.symlink/settings.json" daligner_script="0-raw_reads/daligner-scripts/{{job_id}}.symlink/daligner-script.sh"'
+    output: daligner_settings=dynamic('0-rawreads/daligner-scripts/{job_id}.symlink/settings.json'), daligner_script=dynamic('0-rawreads/daligner-scripts/{job_id}.symlink/daligner-script.sh')
+    shell: 'python -m falcon_kit.mains.copy_mapped --special-split={input} daligner_settings="0-rawreads/daligner-scripts/{{job_id}}.symlink/settings.json" daligner_script="0-rawreads/daligner-scripts/{{job_id}}.symlink/daligner-script.sh"'
 
-rule static_0_raw_reads__job_id_:
-    input:  daligner_script='0-raw_reads/daligner-scripts/{job_id}.symlink/daligner-script.sh', daligner_settings='0-raw_reads/daligner-scripts/{job_id}.symlink/settings.json'
-    output: job_done='0-raw_reads/{job_id}/daligner.done'
+rule static_0_rawreads__job_id_:
+    input:  daligner_script='0-rawreads/daligner-scripts/{job_id}.symlink/daligner-script.sh', daligner_settings='0-rawreads/daligner-scripts/{job_id}.symlink/settings.json'
+    output: job_done='0-rawreads/{job_id}/daligner.done'
     params:
         job_id="{job_id}"
     shell:
@@ -124,7 +124,7 @@ date
 '''
 
 rule dynamic_foo_merge:
-    input:  job_done=ancient(dynamic('0-raw_reads/{job_id}/daligner.done'))
+    input:  job_done=ancient(dynamic('0-rawreads/{job_id}/daligner.done'))
     output: '0-rawreads/daligner-gathered/gathered.json'
     run:
         snake_merge_multi_dynamic(output[0],
@@ -132,7 +132,7 @@ rule dynamic_foo_merge:
               job_done=[str(i) for i in input.job_done]
             ),
             dict(
-              job_done="0-raw_reads/{job_id}/daligner.done"
+              job_done="0-rawreads/{job_id}/daligner.done"
             ),
             ["job_id"] # all wildcards
         )
@@ -178,7 +178,7 @@ rule dynamic_foo1_split:
     output: las_paths=dynamic('0-rawreads/merge-scripts/{job_id}.symlink/las_paths.json'), merged_las_json=dynamic('0-rawreads/merge-scripts/{job_id}.symlink/merged_las.json'), merge_script=dynamic('0-rawreads/merge-scripts/{job_id}.symlink/merge-script.sh')
     shell: 'python -m falcon_kit.mains.copy_mapped --special-split={input} las_paths="0-rawreads/merge-scripts/{{job_id}}.symlink/las_paths.json" merged_las_json="0-rawreads/merge-scripts/{{job_id}}.symlink/merged_las.json" merge_script="0-rawreads/merge-scripts/{{job_id}}.symlink/merge-script.sh"'
 
-rule static_0_rawreads__job_id_:
+rule static_0_rawreads__job_id_1:
     input:  las_paths='0-rawreads/merge-scripts/{job_id}.symlink/las_paths.json', merge_script='0-rawreads/merge-scripts/{job_id}.symlink/merge-script.sh', merged_las_json='0-rawreads/merge-scripts/{job_id}.symlink/merged_las.json'
     output: job_done='0-rawreads/{job_id}/merge.done', merged_las='0-rawreads/{job_id}/merged.las'
     params:
