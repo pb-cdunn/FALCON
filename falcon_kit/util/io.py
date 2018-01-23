@@ -213,7 +213,7 @@ def validated_fns(fofn):
 
 def yield_validated_fns(fofn):
     """Return list of filenames from fofn, either abs or relative to CWD instead of dir of fofn.
-    Assert none are empty or non-existent.
+    Assert none are empty/non-existent.
     """
     dirname = os.path.normpath(os.path.dirname(fofn)) # normpath makes '' become '.'
     try:

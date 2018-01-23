@@ -188,45 +188,29 @@ def run(wf, config, rule_writer,
     # Store config as JSON, available to many tasks.
 
     if config['input_type'] == 'raw':
-        rawread_fofn_plf = makePypeLocalFile(os.path.join(
-            rawread_dir, 'raw-fofn-abs', os.path.basename(config['input_fofn'])))
-        make_fofn_abs_task = PypeTask(inputs={'i_fofn': input_fofn_plf},
-                                      outputs={'o_fofn': rawread_fofn_plf},
-                                      parameters={},
-                                      )
-        fofn_abs_task = make_fofn_abs_task(pype_tasks.task_make_fofn_abs_raw)
-
-        wf.addTasks([fofn_abs_task])
-        wf.refreshTargets([fofn_abs_task])
+        rdb_build_done = os.path.join(rawread_dir, 'rdb_build_done')
+        run_jobs_fn = os.path.join(rawread_dir, 'run_jobs.sh')
+        length_cutoff_fn = os.path.join(rawread_dir, 'length_cutoff')
+        raw_reads_db_fn = os.path.join(rawread_dir, 'raw_reads.db')
+        # Also .raw_reads.*, of course.
 
         # import sequences into daligner DB
-        sleep_done = makePypeLocalFile(os.path.join(rawread_dir, 'sleep_done'))
-        rdb_build_done = makePypeLocalFile(
-            os.path.join(rawread_dir, 'rdb_build_done'))
-        run_jobs = makePypeLocalFile(os.path.join(rawread_dir, 'run_jobs.sh'))
-        parameters = {#'work_dir': rawread_dir,
-                      #'sge_option': config['sge_option_da'],
-                      #'config_fn': input_config_fn,
-                      'config': config,
-        }
-        length_cutoff_plf = makePypeLocalFile(
-            os.path.join(rawread_dir, 'length_cutoff'))
-        raw_reads_db_plf = makePypeLocalFile(
-            os.path.join(rawread_dir, '%s.db' % 'raw_reads'))
-        make_build_rdb_task = PypeTask(inputs={'input_fofn': rawread_fofn_plf},
-                                       outputs={'rdb_build_done': rdb_build_done,
-                                                'raw_reads_db': raw_reads_db_plf,
-                                                'length_cutoff': length_cutoff_plf,
-                                                'run_jobs': run_jobs,
-                                                },
-                                       parameters=parameters,
-                                       )
-        build_rdb_task = make_build_rdb_task(pype_tasks.task_build_rdb)
-
-        wf.addTasks([build_rdb_task])
-        wf.refreshTargets([rdb_build_done])
-
-        raw_reads_nblock = support.get_nblock(fn(raw_reads_db_plf)) ### DROP
+        # and calculate length_cutoff (if specified as -1)
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_BUILD_RDB_SCRIPT,
+            inputs={
+                'config': general_config_fn,
+                'raw_reads_fofn': fn(input_fofn_plf),
+            },
+            outputs={
+                'run_jobs': run_jobs_fn,
+                'raw_reads_db': raw_reads_db_fn,
+                'length_cutoff': length_cutoff_fn,
+                'db_build_done': rdb_build_done, # only for ordering
+            },
+            parameters={},
+            rule_writer=rule_writer,
+        ))
 
         # run daligner
         wf.max_jobs = config['da_concurrent_jobs']
@@ -242,7 +226,7 @@ def run(wf, config, rule_writer,
         wf.addTask(gen_task(
             script=pype_tasks.TASK_DALIGNER_SCATTER_SCRIPT,
             inputs={
-                'run_jobs': fn(run_jobs),
+                'run_jobs': run_jobs_fn,
                 'db': rawreads_db_fn,
             },
             outputs={
@@ -289,7 +273,7 @@ def run(wf, config, rule_writer,
         wf.addTask(gen_task(
             script=pype_tasks.TASK_LAS_MERGE_SCATTER_SCRIPT,
             inputs={
-                'run_jobs': fn(run_jobs),
+                'run_jobs': run_jobs_fn,
                 'gathered_las': r_gathered_las_fn,
             },
             outputs={
@@ -343,8 +327,8 @@ def run(wf, config, rule_writer,
             script=pype_tasks.TASK_CONSENSUS_SCATTER_SCRIPT,
             inputs={
                 'las_fopfn': las_fopfn_fn,
-                'raw_reads_db': fn(raw_reads_db_plf),
-                'length_cutoff': fn(length_cutoff_plf),
+                'raw_reads_db': raw_reads_db_fn,
+                'length_cutoff': length_cutoff_fn,
                 'config': general_config_fn,
             },
             outputs={
@@ -362,8 +346,8 @@ def run(wf, config, rule_writer,
                 script=pype_tasks.TASK_CONSENSUS_TASK_SCRIPT,
                 inputs = {
                     'las': '0-rawreads/cns-scatter/{cns_id}/merged.{cns_id2}.las',
-                    'db': fn(raw_reads_db_plf),
-                    'length_cutoff': fn(length_cutoff_plf),
+                    'db': raw_reads_db_fn,
+                    'length_cutoff': length_cutoff_fn,
                     'config': general_config_fn,
                 },
                 outputs = {
@@ -392,8 +376,8 @@ def run(wf, config, rule_writer,
         params['genome_length'] = config['genome_size'] # note different name; historical
         wf.addTask(gen_task(
             script=pype_tasks.TASK_REPORT_PRE_ASSEMBLY_SCRIPT,
-            inputs={'length_cutoff': fn(length_cutoff_plf),
-                    'raw_reads_db': fn(raw_reads_db_plf),
+            inputs={'length_cutoff': length_cutoff_fn,
+                    'raw_reads_db': raw_reads_db_fn,
                     'preads_fofn': preads_fofn_fn,
                     'config': general_config_fn,
             },

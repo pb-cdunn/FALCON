@@ -175,7 +175,7 @@ def get_last_block(fn):
     return (new_db, last_block)
 
 
-def script_build_rdb(config, input_fofn_fn, run_jobs_bfn):
+def script_build_rdb(config, input_fofn_fn, run_jobs_bfn, length_cutoff_fn='length_cutoff'):
     """
     raw_reads.db will be output into CWD, should not already exist.
     run_jobs_bfn will be output into CWD.
@@ -212,7 +212,7 @@ while read fn; do  {cat_fasta} $fn | fasta2DB -v raw_reads -i${{fn##*/}}; done <
 LB={count}
 rm -f {run_jobs_bfn}
 CUTOFF={bash_cutoff}
-echo -n $CUTOFF >| length_cutoff
+echo -n $CUTOFF >| {length_cutoff_fn}
 HPC.daligner {pa_HPCdaligner_option} -mdust -H$CUTOFF raw_reads {last_block}-$LB >| {run_jobs_bfn}
 """.format(**params)
     return script

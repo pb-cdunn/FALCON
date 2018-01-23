@@ -61,6 +61,24 @@ hostname
 pwd
 ''')
 
+rule static_0_rawreads:
+    input:  config='config.json', raw_reads_fofn='input.fofn'
+    output: db_build_done='0-rawreads/rdb_build_done', length_cutoff='0-rawreads/length_cutoff', raw_reads_db='0-rawreads/raw_reads.db', run_jobs='0-rawreads/run_jobs.sh'
+    params:
+        topdir=".."
+    shell:
+        '''
+outdir=$(dirname {output[0]})
+#mkdir -p ${{outdir}}
+cd ${{outdir}}
+date
+
+python -m falcon_kit.mains.build_rdb --input-fofn-fn=../{input.raw_reads_fofn} --config-fn=../{input.config} --run-jobs-fn=../{output.run_jobs} --length-cutoff-fn=../{output.length_cutoff} --job-done-fn=../{output.db_build_done}
+touch ../{output.db_build_done}
+
+date
+'''
+
 rule static_0_rawreads_daligner_scatter:
     input:  db='0-rawreads/raw_reads.db', run_jobs='0-rawreads/run_jobs.sh'
     output: scattered='0-rawreads/daligner-scatter/scattered.json'
