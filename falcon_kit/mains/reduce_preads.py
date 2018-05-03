@@ -6,8 +6,10 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import argparse
+import logging
 import sys
-from falcon_kit.FastaReader import open_fasta_reader
+from ..FastaReader import open_fasta_reader
+from ..io import open_progress
 
 default_sg_edges_list_fns = ['./sg_edges_list']
 
@@ -25,7 +27,7 @@ def run(fp_out, preads_fasta_fn, sg_edges_list_fns):
     reads_in_layout = set()
 
     for fn in sg_edges_list_fns:
-        with open(fn) as fp_in:
+        with open_progress(fn) as fp_in:
             for l in fp_in:
                 l = l.strip().split()
                 """001039799:E 000333411:E 000333411 17524 20167 17524 99.62 G"""
@@ -57,5 +59,5 @@ def main(argv=sys.argv):
     run(sys.stdout, **vars(args))
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main(sys.argv)
-

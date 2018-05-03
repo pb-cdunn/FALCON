@@ -4,6 +4,7 @@ from __future__ import division
 from pypeflow.io import (
         syscall, capture, cd,
         mkdirs, symlink, rm, touch, filesize, exists_and_not_empty) # needed?
+import contextlib
 import io
 import logging
 import os
@@ -37,6 +38,7 @@ class Percenter(object):
     """
     def __init__(self, name, total, log=LOG.info, units='units'):
         log('Counting {:,d} {} from\n  "{}"'.format(total, units, name))
+        self.finished = False
         self.total = total
         self.log = log
         self.name = name
@@ -56,14 +58,38 @@ class Percenter(object):
             self.log('{:>10} count={:15,d} {:6.02f}% {}'.format(
                 '#{:,d}'.format(self.call), self.count, 100.0*self.count/self.total, label))
     def __del__(self):
+        self.finish()
+    def finish(self):
+        if self.finished:
+            return
         self.log('Counted {:,d} {} in {} calls from:\n  "{}"'.format(
             self.count, self.units, self.call, self.name))
+        self.finished = True
 
 
 class FilePercenter(Percenter):
     def __init__(self, fn, log=LOG.info):
         Percenter.__init__(self, fn, filesize(fn), log, units='bytes')
 
+@contextlib.contextmanager
+def open_progress(fn, log=LOG.info):
+    """
+    Usage:
+        with open_progress('foo', log=LOG.info) as stream:
+            for line in stream:
+                use(line)
+
+    That will log progress lines.
+    """
+    def get_iter(stream, progress):
+        for line in stream:
+            progress(len(line))
+            yield line
+
+    fp = FilePercenter(fn, log=log)
+    with open(fn) as stream:
+        yield get_iter(stream, fp)
+    fp.finish()
 
 def read_as_msgpack(stream):
     import msgpack

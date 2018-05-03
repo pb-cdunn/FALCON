@@ -23,10 +23,12 @@ from __future__ import print_function
 from builtins import zip
 from builtins import range
 import argparse
+import logging
 import sys
 import networkx as nx
 #from pbcore.io import FastaReader
-from falcon_kit.FastaReader import open_fasta_reader
+from ..FastaReader import open_fasta_reader
+from ..io import open_progress
 from falcon_kit import kup, falcon, DWA
 
 RCMAP = dict(zip("ACGTacgtNn-", "TGCAtgcaNn-"))
@@ -124,7 +126,7 @@ def run(improper_p_ctg, proper_a_ctg, preads_fasta_fn, sg_edges_list_fn, utg_dat
     We used to need that for unzip.
     """
     reads_in_layout = set()
-    with open(sg_edges_list_fn) as f:
+    with open_progress(sg_edges_list_fn) as f:
         for l in f:
             l = l.strip().split()
             """001039799:E 000333411:E 000333411 17524 20167 17524 99.62 G"""
@@ -145,7 +147,7 @@ def run(improper_p_ctg, proper_a_ctg, preads_fasta_fn, sg_edges_list_fn, utg_dat
             seqs[r.name] = r.sequence.upper() # name == rid-string
 
     edge_data = {}
-    with open(sg_edges_list_fn) as f:
+    with open_progress(sg_edges_list_fn) as f:
         for l in f:
             l = l.strip().split()
             """001039799:E 000333411:E 000333411 17524 20167 17524 99.62 G"""
@@ -174,7 +176,7 @@ def run(improper_p_ctg, proper_a_ctg, preads_fasta_fn, sg_edges_list_fn, utg_dat
             edge_data[(v, w)] = (rid, s, t, aln_score, idt, e_seq)
 
     utg_data = {}
-    with open(utg_data_fn) as f:
+    with open_progress(utg_data_fn) as f:
         for l in f:
             l = l.strip().split()
             s, v, t, type_, length, score, path_or_edges = l
@@ -197,7 +199,7 @@ def run(improper_p_ctg, proper_a_ctg, preads_fasta_fn, sg_edges_list_fn, utg_dat
     a_ctg_base_t_out = open("a_ctg_base_tiling_path", "w")
     layout_ctg = set()
 
-    with open(ctg_paths_fn) as f:
+    with open_progress(ctg_paths_fn) as f:
         for l in f:
             l = l.strip().split()
             ctg_id, c_type_, i_utig, t0, length, score, utgs = l
@@ -424,4 +426,5 @@ We write these:
     run(**vars(args))
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main(sys.argv)
