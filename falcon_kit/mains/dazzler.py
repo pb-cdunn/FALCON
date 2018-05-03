@@ -258,9 +258,11 @@ def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
             'TANmask {} {}\n'.format(db, las_files),
             'rm -f {}\n'.format(las_files),
         ]
-        if len(blocks) == 1:
-            # special case
-            assert blocks == [''], "{!r} != ['']".format(blocks)
+        if [''] == blocks:
+            # special case -- If we have only 1 block, then HPC.TANmask fails to use the block-number.
+            # However, if there are multiple blocks, it is still possible for a single line to have
+            # only 1 block. So we look for a solitary block that is '', and we symlink the .las to pretend
+            # that it was named properly in the first place.
             script_lines.append('mv .{db}.tan.data .{db}.1.tan.data\n'.format(db=db))
             script_lines.append('mv .{db}.tan.anno .{db}.1.tan.anno\n'.format(db=db))
         scripts.append(''.join(script_lines))
