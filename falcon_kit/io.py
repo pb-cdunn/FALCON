@@ -38,7 +38,6 @@ class Percenter(object):
     """
     def __init__(self, name, total, log=LOG.info, units='units'):
         log('Counting {:,d} {} from\n  "{}"'.format(total, units, name))
-        self.finished = False
         self.total = total
         self.log = log
         self.name = name
@@ -57,14 +56,9 @@ class Percenter(object):
             self.next_count = self.count + self.a
             self.log('{:>10} count={:15,d} {:6.02f}% {}'.format(
                 '#{:,d}'.format(self.call), self.count, 100.0*self.count/self.total, label))
-    def __del__(self):
-        self.finish()
     def finish(self):
-        if self.finished:
-            return
         self.log('Counted {:,d} {} in {} calls from:\n  "{}"'.format(
             self.count, self.units, self.call, self.name))
-        self.finished = True
 
 
 class FilePercenter(Percenter):
@@ -72,7 +66,7 @@ class FilePercenter(Percenter):
         Percenter.__init__(self, fn, filesize(fn), log, units='bytes')
 
 @contextlib.contextmanager
-def open_progress(fn, log=LOG.info):
+def open_progress(fn, mode='r', log=LOG.info):
     """
     Usage:
         with open_progress('foo', log=LOG.info) as stream:
@@ -87,7 +81,7 @@ def open_progress(fn, log=LOG.info):
             yield line
 
     fp = FilePercenter(fn, log=log)
-    with open(fn) as stream:
+    with open(fn, mode=mode) as stream:
         yield get_iter(stream, fp)
     fp.finish()
 
