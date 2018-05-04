@@ -124,7 +124,7 @@ def build_db(config, input_fofn_fn, db_fn, length_cutoff_fn):
         input_fofn_fn, db_fn))
     db = os.path.splitext(db_fn)[0]
 
-    # First, make FOFN relative to thisdir.
+    # First, fix-up FOFN for thisdir.
     my_input_fofn_fn = 'my.' + os.path.basename(input_fofn_fn)
     with open(my_input_fofn_fn, 'w') as stream:
         for fn in yield_validated_fns(input_fofn_fn):
