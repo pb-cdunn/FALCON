@@ -37,9 +37,9 @@ case "${bamboo_planRepository_branchName}" in
     ;;
 esac
 
+rsync -av ./wheelhouse/ ${WHEELHOUSE}
+
 # http://bamboo.pacificbiosciences.com:8085/build/admin/edit/defaultBuildArtifact.action?buildKey=SAT-TAGDEPS-JOB1
 # For old artifact config:
 mkdir -p ./artifacts/gcc-6.4.0/wheelhouse
 rsync -av ${WHEELHOUSE}/falcon*.whl artifacts/gcc-6.4.0/wheelhouse/
-
-rsync -av ./wheelhouse/ ${WHEELHOUSE}
