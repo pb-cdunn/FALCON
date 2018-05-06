@@ -6,15 +6,14 @@ ifndef PYTHONUSERBASE
   export PATH
 endif
 
-WHEELHOUSE?=wheelhouse
-PIP=pip wheel --wheel-dir ${WHEELHOUSE}
+WHEELHOUSE?="/mnt/software/p/python/wheelhouse/develop/"
 
 MY_TEST_FLAGS?=-v -s --durations=0
 
 DOCTEST_MODULES= falcon_kit/functional.py falcon_kit/mains/consensus_task.py falcon_kit/mains/las_merge_split.py
 
 install-edit:
-	pip -v install --user --edit .
+	pip -v install --user  --no-index --find-links=${WHEELHOUSE} --edit .
 install: wheel
 	pip -v install --user --use-wheel --find-links=dist/ .
 pylint:
@@ -33,7 +32,7 @@ old-wheel:
 
 wheel:
 	which pip
-	${PIP} --no-deps .
+	pip wheel -v --wheel-dir=./wheelhouse --no-deps .
 	ls -larth ${WHEELHOUSE}
 
 tar:
