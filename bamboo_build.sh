@@ -36,7 +36,6 @@ make install-edit
 
 export MY_TEST_FLAGS="-v -s --durations=0 --cov=falcon_kit --cov-report=term-missing --cov-report=xml:coverage.xml --cov-branch"
 make test
-sed -i -e 's@filename="@filename="./falcon_kit/@g' coverage.xml
 
 make pylint
 
