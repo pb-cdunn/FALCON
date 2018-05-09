@@ -23,16 +23,13 @@ from __future__ import print_function
 from builtins import zip
 from builtins import range
 import argparse
+import logging
 import sys
 import networkx as nx
 #from pbcore.io import FastaReader
-from falcon_kit.FastaReader import open_fasta_reader
+from ..FastaReader import open_fasta_reader
+from ..io import open_progress
 from falcon_kit import kup, falcon, DWA
-
-read_fasta = "preads4falcon.fasta"
-edge_data_file = "sg_edges_list"
-utg_data_file = "utg_data"
-ctg_data_file = "ctg_paths"
 
 RCMAP = dict(zip("ACGTacgtNn-", "TGCAtgcaNn-"))
 
@@ -124,12 +121,12 @@ def yield_first_seq(one_path_edges, seqs):
                 yield first_seq
 
 
-def run(improper_p_ctg, proper_a_ctg):
+def run(improper_p_ctg, proper_a_ctg, preads_fasta_fn, sg_edges_list_fn, utg_data_fn, ctg_paths_fn):
     """improper==True => Neglect the initial read.
     We used to need that for unzip.
     """
     reads_in_layout = set()
-    with open(edge_data_file) as f:
+    with open_progress(sg_edges_list_fn) as f:
         for l in f:
             l = l.strip().split()
             """001039799:E 000333411:E 000333411 17524 20167 17524 99.62 G"""
@@ -143,14 +140,14 @@ def run(improper_p_ctg, proper_a_ctg):
 
     seqs = {}
     # load all p-read name into memory
-    with open_fasta_reader(read_fasta) as f:
+    with open_fasta_reader(preads_fasta_fn) as f:
         for r in f:
             if r.name not in reads_in_layout:
                 continue
             seqs[r.name] = r.sequence.upper() # name == rid-string
 
     edge_data = {}
-    with open(edge_data_file) as f:
+    with open_progress(sg_edges_list_fn) as f:
         for l in f:
             l = l.strip().split()
             """001039799:E 000333411:E 000333411 17524 20167 17524 99.62 G"""
@@ -179,7 +176,7 @@ def run(improper_p_ctg, proper_a_ctg):
             edge_data[(v, w)] = (rid, s, t, aln_score, idt, e_seq)
 
     utg_data = {}
-    with open(utg_data_file) as f:
+    with open_progress(utg_data_fn) as f:
         for l in f:
             l = l.strip().split()
             s, v, t, type_, length, score, path_or_edges = l
@@ -202,7 +199,7 @@ def run(improper_p_ctg, proper_a_ctg):
     a_ctg_base_t_out = open("a_ctg_base_tiling_path", "w")
     layout_ctg = set()
 
-    with open(ctg_data_file) as f:
+    with open_progress(ctg_paths_fn) as f:
         for l in f:
             l = l.strip().split()
             ctg_id, c_type_, i_utig, t0, length, score, utgs = l
@@ -388,7 +385,6 @@ def run(improper_p_ctg, proper_a_ctg):
     a_ctg_out.close()
     a_ctg_base_out.close()
     p_ctg_out.close()
-    a_ctg_t_out.close()
     a_ctg_base_t_out.close()
     a_ctg_t_out.close()
     p_ctg_t_out.close()
@@ -397,13 +393,6 @@ def run(improper_p_ctg, proper_a_ctg):
 def main(argv=sys.argv):
     description = 'Generate the primary and alternate contig fasta files and tiling paths, given the string graph.'
     epilog = """
-We assume these input files, in cwd:
-
-    read_fasta = "preads4falcon.fasta"
-    edge_data_file = "sg_edges_list"
-    utg_data_file = "utg_data"
-    ctg_data_file = "ctg_paths"
-
 We write these:
 
     p_ctg_out = open("p_ctg.fa", "w")
@@ -421,9 +410,21 @@ We write these:
             help='Skip the initial read in each p_ctg path.')
     parser.add_argument('--proper-a-ctg', action='store_true',
             help='Skip the initial read in each a_ctg path.')
+    parser.add_argument('--preads-fasta-fn', type=str,
+            default='./preads4falcon.fasta',
+            help='Input. Preads file, required to construct the contigs.')
+    parser.add_argument('--sg-edges-list-fn', type=str,
+            default='./sg_edges_list',
+            help='Input. File containing string graph edges, produced by ovlp_to_graph.py.')
+    parser.add_argument('--utg-data-fn', type=str,
+            default='./utg_data',
+            help='Input. File containing unitig data, produced by ovlp_to_graph.py.')
+    parser.add_argument('--ctg-paths-fn', type=str,
+            default='./ctg_paths',
+            help='Input. File containing contig paths, produced by ovlp_to_graph.py.')
     args = parser.parse_args(argv[1:])
     run(**vars(args))
 
-
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main(sys.argv)

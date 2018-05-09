@@ -124,7 +124,7 @@ def build_db(config, input_fofn_fn, db_fn, length_cutoff_fn):
         input_fofn_fn, db_fn))
     db = os.path.splitext(db_fn)[0]
 
-    # First, make FOFN relative to thisdir.
+    # First, fix-up FOFN for thisdir.
     my_input_fofn_fn = 'my.' + os.path.basename(input_fofn_fn)
     with open(my_input_fofn_fn, 'w') as stream:
         for fn in yield_validated_fns(input_fofn_fn):
@@ -132,8 +132,8 @@ def build_db(config, input_fofn_fn, db_fn, length_cutoff_fn):
             stream.write('\n')
     script = ''.join([
         script_build_db(config, my_input_fofn_fn, db),
-        script_length_cutoff(config, db, length_cutoff_fn),
         script_DBsplit(config, db),
+        script_length_cutoff(config, db, length_cutoff_fn),
     ])
     script_fn = 'build_db.sh'
     with open(script_fn, 'w') as ofs:
@@ -154,9 +154,9 @@ echo "PATH=$PATH"
 which HPC.daligner
 HPC.daligner -P. {daligner_opt} {masks} -H$CUTOFF -f{prefix} {db} >| run_jobs.sh
     """.format(**params)
-def script_HPC_TANmask(db, prefix):
+def script_HPC_TANmask(config, db, prefix):
     assert prefix and '/' not in prefix
-    params = dict() #dict(config)
+    params = dict(config)
     params.update(locals())
     return """
 rm -f {prefix}.*
@@ -165,7 +165,7 @@ rm -f .{db}.*.tan.data
 echo "SMRT_PYTHON_PATH_PREPEND=$SMRT_PYTHON_PATH_PREPEND"
 echo "PATH=$PATH"
 which HPC.TANmask
-HPC.TANmask -P. -f{prefix} {db}
+HPC.TANmask -P. {TANmask_opt} -v -f{prefix} {db}
     """.format(**params)
 
 def symlink(actual, symbolic=None, force=True):
@@ -217,7 +217,7 @@ def symlink_db(db_fn):
             symlink(fn)
     return dbname
 
-def tan_split(config_fn, db_fn, uows_fn, bash_template_fn):
+def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
     with open(bash_template_fn, 'w') as stream:
         stream.write(pype_tasks.TASK_DB_TAN_APPLY_SCRIPT)
     # TANmask would put track-files in the DB-directory, not '.',
@@ -225,7 +225,7 @@ def tan_split(config_fn, db_fn, uows_fn, bash_template_fn):
     db = symlink_db(db_fn)
 
     script = ''.join([
-        script_HPC_TANmask(db, prefix='tan-jobs'),
+        script_HPC_TANmask(config, db, prefix='tan-jobs'),
     ])
     script_fn = 'split_db.sh'
     with open(script_fn, 'w') as ofs:
@@ -258,9 +258,11 @@ def tan_split(config_fn, db_fn, uows_fn, bash_template_fn):
             'TANmask {} {}\n'.format(db, las_files),
             'rm -f {}\n'.format(las_files),
         ]
-        if len(blocks) == 1:
-            # special case
-            assert blocks == [''], "{!r} != ['']".format(blocks)
+        if [''] == blocks:
+            # special case -- If we have only 1 block, then HPC.TANmask fails to use the block-number.
+            # However, if there are multiple blocks, it is still possible for a single line to have
+            # only 1 block. So we look for a solitary block that is '', and we symlink the .las to pretend
+            # that it was named properly in the first place.
             script_lines.append('mv .{db}.tan.data .{db}.1.tan.data\n'.format(db=db))
             script_lines.append('mv .{db}.tan.anno .{db}.1.tan.anno\n'.format(db=db))
         scripts.append(''.join(script_lines))
@@ -380,13 +382,13 @@ def daligner_split(config, config_fn, db_fn, nproc, wildcards, length_cutoff_fn,
         re_script = re.compile(r'(mv\b.*\S+\s+)(\S+)$') # no trailing newline, for now
         mo = re_script.search(script)
         if not mo:
-            msg = 'Only 1 line in daligner-jobs.01.OVL, but {!r} did not match {!r}.'.format(
-                script, re_script.pattern)
+            msg = 'Only 1 line in daligner-jobs.01.OVL, but\n {!r} did not match\n {!r}.'.format(
+                re_script.pattern, script)
             LOG.warning(msg)
         else:
             new_script = re_script.sub(r'\1{dbname}.1.{dbname}.1.las'.format(dbname=dbname), script, 1)
-            msg = 'Only 1 line in daligner-jobs.01.OVL; {!r} matches\n {!r}. Replacing with\n {!r}.'.format(
-                script, re_script.pattern, new_script)
+            msg = 'Only 1 line in daligner-jobs.01.OVL:\n {!r} matches\n {!r}. Replacing with\n {!r}.'.format(
+                re_script.pattern, script, new_script)
             LOG.warning(msg)
             scripts = [new_script]
 
@@ -659,7 +661,8 @@ def cmd_build(args):
     ours = get_ours(args.config_fn, args.db_fn)
     build_db(ours, args.input_fofn_fn, args.db_fn, args.length_cutoff_fn)
 def cmd_tan_split(args):
-    tan_split(args.config_fn, args.db_fn, args.split_fn, args.bash_template_fn)
+    ours = get_ours(args.config_fn, args.db_fn)
+    tan_split(ours, args.config_fn, args.db_fn, args.split_fn, args.bash_template_fn)
 def cmd_tan_apply(args):
     tan_apply(args.db_fn, args.script_fn, args.job_done_fn)
 def cmd_tan_combine(args):
@@ -684,6 +687,7 @@ For raw_reads.db, we also look for the following config keys:
 
 - pa_DBsplit_option
 - pa_HPCdaligner_option
+- pa_HPCTANmask_option
 - length_cutoff: -1 => calculate based on "genome_size" and "seed_coverage" config.
 - seed_coverage
 - genome_size
@@ -692,6 +696,7 @@ For preads.db, these are named:
 
 - ovlp_DBsplit_option
 - ovlp_HPCdaligner_option
+- ovlp_HPCTANmask_option
 - length_cutoff_pr
 """
 
@@ -703,15 +708,13 @@ def get_ours(config_fn, db_fn):
     if os.path.basename(db_fn).startswith('preads'):
         ours['DBsplit_opt'] = config.get('ovlp_DBsplit_option', '')
         ours['daligner_opt'] = config.get('ovlp_HPCdaligner_option', '')
+        ours['TANmask_opt'] = config.get('ovlp_HPCTANmask_option', '')
         ours['user_length_cutoff'] = int(config.get('length_cutoff_pr', '0'))
     else:
         ours['DBsplit_opt'] = config.get('pa_DBsplit_option', '')
         ours['daligner_opt'] = config.get('pa_HPCdaligner_option', '')
+        ours['TANmask_opt'] = config.get('pa_HPCTANmask_option', '')
         ours['user_length_cutoff'] = int(config.get('length_cutoff', '0'))
-    # TODO: TEMP -- Delete asserts!
-    assert ours['DBsplit_opt']
-    assert ours['daligner_opt']
-    assert ours['user_length_cutoff']
 
     LOG.info('config({!r}):\n{}'.format(config_fn, config))
     LOG.info('our subset of config:\n{}'.format(ours))

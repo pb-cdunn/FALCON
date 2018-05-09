@@ -4,6 +4,7 @@ from __future__ import division
 from pypeflow.io import (
         syscall, capture, cd,
         mkdirs, symlink, rm, touch, filesize, exists_and_not_empty) # needed?
+import contextlib
 import io
 import logging
 import os
@@ -22,41 +23,67 @@ def log(*msgs):
     LOG.debug(' '.join(repr(m) for m in msgs))
 
 
-def validate_config(config):
-    # This simple and quick check catches common problems early.
-    # This code might go somewhere else someday.
-    smrt_bin_cmds = [
-        'blasr', 'samtools', 'pbalign', 'variantCaller',
-    ]
-    path_cmds = [
-        'nucmer',
-        'show-coords',
-        'fc_rr_hctg_track2.exe',
-    ]
-    LOG.info('PATH={}'.format(os.environ['PATH']))
-    try:
-        capture('which which')
-    except Exception:
-        LOG.warning('Could not find "which" command. Skipping checks for "blasr", etc.')
-        return
-    for cmd in smrt_bin_cmds + path_cmds:
-        syscall('which ' + cmd)
-    syscall('show-coords -h')
-    syscall('nucmer --version')
-
-
-def update_env_from_config(config, fn):
-    LOG.info('From {!r}, config={}'.format(fn, pprint.pformat(config)))
-    smrt_bin = config.get('smrt_bin')
-    if smrt_bin:
-        PATH = '{}:{}'.format(os.environ['PATH'], smrt_bin)
-        os.environ['PATH'] = PATH
-    validate_config(config)
-
-
 def eng(number):
     return '{:.1f}MB'.format(number / 2**20)
 
+
+class Percenter(object):
+    """Report progress by golden exponential.
+
+    Usage:
+        counter = Percenter('mystruct', total_len(mystruct))
+
+        for rec in mystruct:
+            counter(len(rec))
+    """
+    def __init__(self, name, total, log=LOG.info, units='units'):
+        log('Counting {:,d} {} from\n  "{}"'.format(total, units, name))
+        self.total = total
+        self.log = log
+        self.name = name
+        self.units = units
+        self.call = 0
+        self.count = 0
+        self.next_count = 0
+        self.a = 1 # double each time
+    def __call__(self, more, label=''):
+        self.call += 1
+        self.count += more
+        if self.next_count <= self.count:
+            self.a = 2 * self.a
+            self.a = max(self.a, more)
+            self.a = min(self.a, (self.total-self.count), round(self.total/10.0))
+            self.next_count = self.count + self.a
+            self.log('{:>10} count={:15,d} {:6.02f}% {}'.format(
+                '#{:,d}'.format(self.call), self.count, 100.0*self.count/self.total, label))
+    def finish(self):
+        self.log('Counted {:,d} {} in {} calls from:\n  "{}"'.format(
+            self.count, self.units, self.call, self.name))
+
+
+class FilePercenter(Percenter):
+    def __init__(self, fn, log=LOG.info):
+        Percenter.__init__(self, fn, filesize(fn), log, units='bytes')
+
+@contextlib.contextmanager
+def open_progress(fn, mode='r', log=LOG.info):
+    """
+    Usage:
+        with open_progress('foo', log=LOG.info) as stream:
+            for line in stream:
+                use(line)
+
+    That will log progress lines.
+    """
+    def get_iter(stream, progress):
+        for line in stream:
+            progress(len(line))
+            yield line
+
+    fp = FilePercenter(fn, log=log)
+    with open(fn, mode=mode) as stream:
+        yield get_iter(stream, fp)
+    fp.finish()
 
 def read_as_msgpack(stream):
     import msgpack
@@ -116,27 +143,19 @@ def serialize(fn, val):
             raise Exception('Unknown extension for {!r}'.format(fn))
 
 
-def yield_bam_fn(input_bam_fofn_fn):
-    LOG.info('Reading BAM names from FOFN {!r}'.format(input_bam_fofn_fn))
-    fofn_basedir = os.path.normpath(os.path.dirname(input_bam_fofn_fn))
-
-    def abs_fn(maybe_rel_fn):
-        if os.path.isabs(maybe_rel_fn):
-            return maybe_rel_fn
-        else:
-            return os.path.join(fofn_basedir, maybe_rel_fn)
-    for row in open(input_bam_fofn_fn):
-        yield abs_fn(row.strip())
-
-
 def yield_abspath_from_fofn(fofn_fn):
     """Yield each filename.
     Relative paths are resolved from the FOFN directory.
+    'fofn_fn' can be .fofn, .json, .msgpack
     """
     try:
+        fns = deserialize(fofn_fn)
+    except:
+        #LOG('las fofn {!r} does not seem to be JSON; try to switch, so we can detect truncated files.'.format(fofn_fn))
+        fns = open(fofn_fn).read().strip().split()
+    try:
         basedir = os.path.dirname(fofn_fn)
-        for line in open(fofn_fn):
-            fn = line.strip()
+        for fn in fns:
             if not os.path.isabs(fn):
                 fn = os.path.abspath(os.path.join(basedir, fn))
             yield fn
