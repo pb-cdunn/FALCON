@@ -147,9 +147,11 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
                                  squash=squash,
     )
     general_config['ver'] = '100'
+    # Store config as JSON, available to many tasks.
     config_fn = './config.json' # must not be in a task-dir
     io.serialize(config_fn, config)
-    with open('foo.snake', 'w') as snakemake_writer:
+    #with open('foo.snake', 'w') as snakemake_writer:
+    with open('/dev/null', 'w') as snakemake_writer:
         rule_writer = snakemake.SnakemakeRuleWriter(snakemake_writer)
         run(wf, config, rule_writer,
             os.path.abspath(config_fn),
@@ -189,10 +191,10 @@ def run(wf, config, rule_writer,
     assert general_config['input_type'] in (
         'raw', 'preads'), 'Invalid input_type=={!r}'.format(general_config['input_type'])
 
-    # Store config as JSON, available to many tasks.
+    parameters = {}
 
     if general_config['input_type'] == 'raw':
-        parameters = {}
+        # Most common workflow: Start with rawreads.
 
         # import sequences into daligner DB
         # calculate length_cutoff (if specified as -1)
