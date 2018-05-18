@@ -147,9 +147,11 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
                                  squash=squash,
     )
     general_config['ver'] = '100'
+    # Store config as JSON, available to many tasks.
     config_fn = './config.json' # must not be in a task-dir
     io.serialize(config_fn, config)
-    with open('foo.snake', 'w') as snakemake_writer:
+    #with open('foo.snake', 'w') as snakemake_writer:
+    with open('/dev/null', 'w') as snakemake_writer:
         rule_writer = snakemake.SnakemakeRuleWriter(snakemake_writer)
         run(wf, config, rule_writer,
             os.path.abspath(config_fn),
@@ -189,10 +191,10 @@ def run(wf, config, rule_writer,
     assert general_config['input_type'] in (
         'raw', 'preads'), 'Invalid input_type=={!r}'.format(general_config['input_type'])
 
-    # Store config as JSON, available to many tasks.
+    parameters = {}
 
     if general_config['input_type'] == 'raw':
-        parameters = {}
+        # Most common workflow: Start with rawreads.
 
         # import sequences into daligner DB
         # calculate length_cutoff (if specified as -1)
@@ -482,25 +484,16 @@ def run(wf, config, rule_writer,
             dist=Dist(local=True),
         ))
 
-    if general_config['target'] == 'pre-assembly':
-        LOG.info('Quitting after stage-0 for "pre-assembly" target.')
-        sys.exit(0)
+        if general_config['target'] == 'pre-assembly':
+            wf.refreshTargets()
+            LOG.info('Quitting after stage-0 for General.target=pre-assembly')
+            return
 
     # build pread database
     if general_config['input_type'] == 'preads':
-        """
-        preads_fofn_plf = makePypeLocalFile(os.path.join(
-            pread_dir, 'preads-fofn-abs', os.path.basename(general_config['input_fofn'])))
-        make_fofn_abs_task = PypeTask(inputs={'i_fofn': input_fofn_plf},
-                                      outputs={'o_fofn': preads_fofn_plf},
-                                      parameters={},
-                                      )
-        fofn_abs_task = make_fofn_abs_task(
-            pype_tasks.task_make_fofn_abs_preads)
-        wf.addTasks([fofn_abs_task])
-        wf.refreshTargets([fofn_abs_task])
-        """
-        raise Exception('TODO')
+        LOG.info('General.input_type=preads, so we skip stage 0-rawreads.')
+        preads_fofn_fn = general_config['input_fofn']
+        assert os.path.exists(preads_fofn_fn), '{!r} does not exist.'.format(preads_fofn_fn)
 
     pdb_build_done = os.path.join(pread_dir, 'pdb_build_done')
     run_jobs_fn = os.path.join(pread_dir, 'run_jobs.sh')
