@@ -21,109 +21,6 @@ import time
 LOG = logging.getLogger(__name__)  # default, for remote tasks
 
 
-def create_daligner_tasks(basedir, scatter_fn):
-    tasks = []
-    tasks_out = {}
-    try:
-        content = json.loads(open(scatter_fn).read())  # array of descriptions
-    except Exception:
-        msg = 'Failed to read JSON from {!r}'.format(scatter_fn)
-        LOG.exception(msg)
-        raise Exception(msg)
-    for section in content:
-        parameters = section['parameters']
-        inputs = section['inputs']
-        inputs['scatter_fn'] = os.path.abspath(scatter_fn)
-        outputs = section['outputs']
-        URL = section['URL']
-        job_uid = parameters['job_uid']
-        wdir = os.path.join(basedir, 'job_%s' % job_uid)
-        make_daligner_task = PypeTask(inputs=inputs,
-                                      outputs=outputs,
-                                      parameters=parameters,
-                                      wdir=wdir,
-                                      )
-        daligner_task = make_daligner_task(pype_tasks.task_run_daligner)
-        tasks.append(daligner_task)
-        # these are relative, so we need the PypeLocalFiles
-        tasks_out['ajob_%s' % job_uid] = daligner_task.outputs['job_done']
-    return tasks, tasks_out
-
-
-def create_merge_tasks(basedir, scatter_fn):
-    tasks = []
-    p_ids_merged_las = {}  # for consensus
-    content = json.loads(open(scatter_fn).read())  # array of descriptions
-    for section in content:
-        parameters = section['parameters']
-        inputs = section['inputs']
-        inputs['scatter_fn'] = os.path.abspath(scatter_fn)
-        outputs = section['outputs']
-        URL = section['URL']
-        p_id = parameters['job_id']
-        wdir = os.path.join(basedir, 'm_%05d' % p_id)
-        make_task = PypeTask(inputs=inputs,
-                             outputs=outputs,
-                             parameters=parameters,
-                             wdir=wdir,
-                             )
-        task = make_task(pype_tasks.task_run_las_merge)
-        tasks.append(task)
-        # these are relative, so we need the PypeLocalFiles
-        las_fn = task.outputs['merged_las']
-        p_ids_merged_las[p_id] = las_fn
-    return tasks, p_ids_merged_las
-
-
-def create_consensus_tasks(basedir, scatter_fn):
-    consensus_tasks = []
-    consensus_out = {}
-    content = json.loads(open(scatter_fn).read())  # array of descriptions
-    for section in content:
-        parameters = section['parameters']
-        inputs = section['inputs']
-        inputs['scatter_fn'] = scatter_fn
-        outputs = section['outputs']
-        URL = section['URL']
-        p_id = int(parameters['job_id'])
-        cns_label = 'cns_%05d' % int(p_id)
-        wdir = os.path.join(basedir, 'preads', cns_label)
-        make_c_task = PypeTask(inputs=inputs,
-                               outputs=outputs,
-                               parameters=parameters,
-                               wdir=wdir,
-                               )
-        c_task = make_c_task(pype_tasks.task_run_consensus)
-        consensus_tasks.append(c_task)
-        consensus_out['cjob_%d' % p_id] = outputs['out_file']
-    return consensus_tasks, consensus_out
-
-
-def create_merge_gather_task(wd, inputs):
-    las_fofn_plf = makePypeLocalFile(os.path.join(wd, 'las.fofn'))
-    las_fopfn_plf = makePypeLocalFile(os.path.join(wd, 'las.fopfn'))
-
-    make_task = PypeTask(inputs=inputs,  # p_ids_merged_las
-                         outputs={'las_fofn': las_fofn_plf,
-                                  'las_fopfn': las_fopfn_plf,
-                                  },
-                         )
-    task = make_task(pype_tasks.task_merge_gather)
-    return task, las_fofn_plf, las_fopfn_plf
-
-
-def create_consensus_gather_task(wd, inputs):
-    # Happens only in stage-0.
-    preads_fofn_plf = makePypeLocalFile(os.path.join(wd, 'input_preads.fofn'))
-
-    make_cns_gather_task = PypeTask(
-        inputs=inputs,  # consensus_out
-        outputs={'preads_fofn': preads_fofn_plf},
-    )
-    task = make_cns_gather_task(pype_tasks.task_cns_gather)
-    return task, preads_fofn_plf
-
-
 def main1(prog_name, input_config_fn, logger_config_fn=None):
     global LOG
     LOG = support.setup_logger(logger_config_fn)
@@ -275,8 +172,11 @@ def run(wf, config, rule_writer,
             dist=Dist(local=True),
         ))
 
-        # run daligner
         wf.max_jobs = config['job.step.da'].get('njobs', default_njobs)
+
+        # run daligner from HPC.REPmask
+
+        # run daligner
         #rawreads_db_fn = os.path.join(rawread_dir, 'raw_reads.db')
         daligner_all_units_fn = os.path.join(
             rawread_dir, 'daligner-split', 'all-units-of-work.json')
