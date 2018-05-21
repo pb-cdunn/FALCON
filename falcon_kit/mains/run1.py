@@ -187,6 +187,7 @@ def run(wf, config, rule_writer,
             daligner_wildcard='dal0_id',
             lamerge_wildcard='mer0_id',
             db_prefix='raw_reads', # TODO: Infer
+            daligner_split_script=pype_tasks.TASK_DB_DALIGNER_SPLIT_SCRIPT,
         )
         ####
 
@@ -321,6 +322,7 @@ def run(wf, config, rule_writer,
         daligner_wildcard='dal1_id',
         lamerge_wildcard='mer0_id', # mer0_id is hard-coded in dazzler, for now
         db_prefix='preads', # TODO: Infer
+        daligner_split_script=pype_tasks.TASK_DB_DALIGNER_SPLIT_SCRIPT,
     )
     ####
 
@@ -373,6 +375,7 @@ def add_daligner_and_merge_tasks(
         daligner_wildcard, #='dal0_id',
         lamerge_wildcard, #='mer0_id',
         db_prefix='raw_reads',
+        daligner_split_script=pype_tasks.TASK_DB_DALIGNER_SPLIT_SCRIPT,
     ):
     """
     Results:
@@ -391,7 +394,7 @@ def add_daligner_and_merge_tasks(
     params['skip_checks'] = int(general_config.get('skip_checks', 0))
     params['wildcards'] = daligner_wildcard
     wf.addTask(gen_task(
-        script=pype_tasks.TASK_DB_DALIGNER_SPLIT_SCRIPT,
+        script=daligner_split_script,
         inputs={
             'config': general_config_fn,
             'db': db_fn,
