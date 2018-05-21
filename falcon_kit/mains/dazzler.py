@@ -140,7 +140,7 @@ def build_db(config, input_fofn_fn, db_fn, length_cutoff_fn):
         exe = bash.write_sub_script(ofs, script)
     io.syscall('bash -vex {}'.format(script_fn))
 
-def script_HPC_daligner(config, db, length_cutoff_fn, tracks, prefix='daligner-jobs'):
+def script_HPC_daligner(config, db, length_cutoff_fn, tracks, prefix):
     params = dict(config)
     masks = ' '.join('-m{}'.format(track) for track in tracks)
     params.update(locals())
@@ -154,6 +154,7 @@ echo "PATH=$PATH"
 which HPC.daligner
 HPC.daligner -P. {daligner_opt} {masks} -H$CUTOFF -f{prefix} {db} >| run_jobs.sh
     """.format(**params)
+
 def script_HPC_TANmask(config, db, prefix):
     assert prefix and '/' not in prefix
     params = dict(config)
@@ -166,6 +167,20 @@ echo "SMRT_PYTHON_PATH_PREPEND=$SMRT_PYTHON_PATH_PREPEND"
 echo "PATH=$PATH"
 which HPC.TANmask
 HPC.TANmask -P. {TANmask_opt} -v -f{prefix} {db}
+    """.format(**params)
+
+def script_HPC_REPmask(config, db, tracks, prefix, group_size, coverage_limit):
+    assert prefix and '/' not in prefix
+    params = dict(config)
+    params.update(locals())
+    return """
+rm -f {prefix}.*
+rm -f .{db}.*.rep*.anno
+rm -f .{db}.*.rep*.data
+echo "SMRT_PYTHON_PATH_PREPEND=$SMRT_PYTHON_PATH_PREPEND"
+echo "PATH=$PATH"
+which HPC.REPmask
+HPC.REPmask -P. -g{group_size} -c{coverage_limit} {REPmask_opt} -v -f{prefix} {db}
     """.format(**params)
 
 def symlink(actual, symbolic=None, force=True):
@@ -328,8 +343,114 @@ def tan_combine(db_fn, gathered_fn, new_db_fn):
     cmd = 'Catrack -vdf {} tan'.format(db)
     io.syscall(cmd)
 
-def split_db(config_fn, daligner_uows_fn, db_fn):
-    raise NotImplementedError('Who dey?')
+def rep_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
+    with open(bash_template_fn, 'w') as stream:
+        stream.write(pype_tasks.TASK_DB_REP_APPLY_SCRIPT)
+    db = symlink_db(db_fn)
+
+def rep_apply(db_fn, script_fn, job_done_fn):
+    # daligner would put track-files in the DB-directory, not '.',
+    # so we need to symlink everything first.
+    db = symlink_db(db_fn)
+
+    symlink(script_fn)
+    io.syscall('bash -vex {}'.format(os.path.basename(script_fn)))
+    io.touch(job_done_fn)
+
+def rep_combine(db_fn, gathered_fn, new_db_fn):
+    new_db = os.path.splitext(new_db_fn)[0]
+    db = symlink_db(db_fn)
+    assert db == new_db, 'basename({!r})!={!r}, but old and new DB names must match.'.format(db_fn, new_db_fn)
+
+    # Remove old, in case of resume.
+    io.syscall('rm -f .{db}.*.rep.anno .{db}.*.rep.data'.format(db=db))
+
+    gathered = io.deserialize(gathered_fn)
+    gathered_dn = os.path.dirname(gathered_fn)
+
+    # Create symlinks for all track-files.
+    for job in gathered:
+        done_fn = job['job_done']
+        done_dn = os.path.dirname(done_fn)
+        if not os.path.isabs(done_dn):
+            LOG.info('Found relative done-file: {!r}'.format(done_fn))
+            done_dn = os.path.join(gathered_dn, done_dn)
+        annos = glob.glob('{}/.{}.*.rep.anno'.format(done_dn, db))
+        datas = glob.glob('{}/.{}.*.rep.data'.format(done_dn, db))
+        assert len(annos) == len(datas), 'Mismatched globs:\n{!r}\n{!r}'.format(annos, datas)
+        for fn in annos + datas:
+            symlink(fn, force=False)
+    cmd = 'Catrack -vdf {} rep'.format(db)
+    io.syscall(cmd)
+
+def rep_daligner_split(config, config_fn, db_fn, nproc, group_size, coverage_limit, uows_fn, bash_template_fn):
+    """Similar to daligner_split(), but based on HPC.REPmask instead of HPC.daligner.
+    """
+    with open(bash_template_fn, 'w') as stream:
+        stream.write(pype_tasks.TASK_DB_DALIGNER_APPLY_SCRIPT)
+    db = os.path.splitext(db_fn)[0]
+    dbname = os.path.basename(db)
+
+    tracks = get_tracks(db_fn)
+
+    script = ''.join([
+        script_HPC_REPmask(config, db, tracks,
+            prefix='rep-jobs', group_size=group_size, coverage_limit=coverage_limit),
+    ])
+    script_fn = 'split_db.sh'
+    with open(script_fn, 'w') as ofs:
+        exe = bash.write_sub_script(ofs, script)
+    io.syscall('bash -vex {}'.format(script_fn))
+
+    # We now have files like rep-jobs.01.OVL
+    # We need to parse that one. (We ignore the others.)
+    lines = open('rep-jobs.01.OVL').readlines()
+
+    scripts = list()
+    for line in lines:
+        if line.startswith('#'):
+            continue
+        if not line.strip():
+            continue
+        scripts.append(line)
+
+    """
+    Special case:
+        # Daligner jobs (1)
+    TODO: Reconsider someday.
+    """
+
+    for i, script in enumerate(scripts):
+        LAcheck = 'LAcheck -vS {} *.las'.format(db)
+        script += '\n' + LAcheck + '\n'
+        scripts[i] = script
+
+    jobs = list()
+    for i, script in enumerate(scripts):
+        job_id = 'rep_{:04d}'.format(i)
+        script_dir = os.path.join('rep-scripts', job_id)
+        script_fn = os.path.join(script_dir, 'run_daligner.sh')
+        io.mkdirs(script_dir)
+        with open(script_fn, 'w') as stream:
+            stream.write('{}\n'.format(script))
+        # Record in a job-dict.
+        job = dict()
+        job['input'] = dict(
+                config=config_fn,
+                db=db_fn,
+                script=os.path.abspath(script_fn),
+        )
+        job['output'] = dict(
+                job_done = 'job.done'
+        )
+        job['params'] = dict(
+        )
+        job['wildcards'] = dict(
+                rep0_id=job_id, # TODO: parameter, since we might have multiple repN
+        )
+        jobs.append(job)
+    io.serialize(uows_fn, jobs)
+
 def get_tracks(db_fn):
     db_dirname, db_basename = os.path.split(db_fn)
     dbname = os.path.splitext(db_basename)[0]
@@ -347,14 +468,14 @@ def daligner_split(config, config_fn, db_fn, nproc, wildcards, length_cutoff_fn,
     tracks = get_tracks(db_fn)
 
     script = ''.join([
-        script_HPC_daligner(config, db, length_cutoff_fn, tracks, 'daligner-jobs'),
+        script_HPC_daligner(config, db, length_cutoff_fn, tracks, prefix='daligner-jobs'),
     ])
     script_fn = 'split_db.sh'
     with open(script_fn, 'w') as ofs:
         exe = bash.write_sub_script(ofs, script)
     io.syscall('bash -vex {}'.format(script_fn))
 
-    # We now have files like tan-jobs.01.OVL
+    # We now have files like daligner-jobs.01.OVL
     # We need to parse that one. (We ignore the others.)
     lines = open('daligner-jobs.01.OVL').readlines()
 
@@ -667,9 +788,27 @@ def cmd_tan_apply(args):
     tan_apply(args.db_fn, args.script_fn, args.job_done_fn)
 def cmd_tan_combine(args):
     tan_combine(args.db_fn, args.gathered_fn, args.new_db_fn)
+def cmd_rep_split(args):
+    ours = get_ours(args.config_fn, args.db_fn)
+    rep_split(ours, args.config_fn, args.db_fn, args.split_fn, args.bash_template_fn)
+def cmd_rep_apply(args):
+    rep_apply(args.db_fn, args.script_fn, args.job_done_fn)
+def cmd_rep_combine(args):
+    rep_combine(args.db_fn, args.gathered_fn, args.new_db_fn)
+def cmd_rep_daligner_split(args):
+    ours = get_ours(args.config_fn, args.db_fn)
+    rep_daligner_split(
+            ours, args.config_fn, args.db_fn, args.nproc,
+            args.group_size, args.coverage_limit,
+            args.split_fn, args.bash_template_fn,
+    )
 def cmd_daligner_split(args):
     ours = get_ours(args.config_fn, args.db_fn)
-    daligner_split(ours, args.config_fn, args.db_fn, args.nproc, args.wildcards, args.length_cutoff_fn, args.split_fn, args.bash_template_fn)
+    daligner_split(
+            ours, args.config_fn, args.db_fn, args.nproc,
+            args.wildcards, args.length_cutoff_fn,
+            args.split_fn, args.bash_template_fn,
+    )
 def cmd_daligner_apply(args):
     daligner_apply(args.db_fn, args.script_fn, args.job_done_fn)
 def cmd_daligner_combine(args):
@@ -732,7 +871,7 @@ def add_build_arguments(parser):
 def add_tan_split_arguments(parser):
     parser.add_argument(
         '--split-fn', default='tan-mask-uows.json',
-        help='output. Units-of-work from TANmask, for datander.',
+        help='output. Units-of-work from HPC.TANmask, for datander.',
     )
     parser.add_argument(
         '--bash-template-fn', default='bash-template.sh',
@@ -756,6 +895,58 @@ def add_tan_combine_arguments(parser):
         '--new-db-fn', required=True,
         help='output. This must match the input DB name. It will be symlinked, except the new track files.',
     )
+def add_rep_split_arguments(parser):
+    parser.add_argument(
+        '--group-size', '-g', required=True, type=int,
+        help='Number of blocks per group. This should match what was passed to HPC.REPmask. Here, it becomes part of the mask name, repN.',
+    )
+    parser.add_argument(
+        '--coverage-limit', '-c', required=True, type=int,
+        help='Coverage threshold for masking.',
+    )
+    parser.add_argument(
+        '--split-fn', default='rep-mask-uows.json',
+        help='output. Units-of-work from earlier HPC.REPmask, for REPmask.',
+    )
+    parser.add_argument(
+        '--bash-template-fn', default='bash-template.sh',
+        help='output. Script to apply later.',
+    )
+def add_rep_apply_arguments(parser):
+    parser.add_argument(
+        '--script-fn', required=True,
+        help='input. Script to run REPmask.',
+    )
+    parser.add_argument(
+        '--job-done-fn', default='job.done',
+        help='output. Sentinel.',
+    )
+def add_rep_combine_arguments(parser):
+    parser.add_argument(
+        '--gathered-fn', required=True,
+        help='input. List of sentinels. Produced by gen_parallel_tasks() gathering. The rep-track files are next to these.',
+    )
+    parser.add_argument(
+        '--new-db-fn', required=True,
+        help='output. This must match the input DB name. It will be symlinked, except the new track files.',
+    )
+def add_rep_daligner_split_arguments(parser):
+    parser.add_argument(
+        '--group-size', '-g', required=True, type=int,
+        help='Number of blocks per group. This should match what was passed to HPC.REPmask. Here, it becomes part of the mask name, repN.',
+    )
+    parser.add_argument(
+        '--coverage-limit', '-c', required=True, type=int,
+        help='Coverage threshold for masking.',
+    )
+    parser.add_argument(
+        '--split-fn', default='rep-daligner-uows.json',
+        help='output. Units-of-work from HPC.REPmask, for daligner.',
+    )
+    parser.add_argument(
+        '--bash-template-fn', default='bash-template.sh',
+        help='output. Script to apply later.',
+    )
 def add_daligner_split_arguments(parser):
     parser.add_argument(
         '--wildcards', default='dummy_wildcard',
@@ -767,7 +958,7 @@ def add_daligner_split_arguments(parser):
     )
     parser.add_argument(
         '--split-fn', default='daligner-mask-uows.json',
-        help='output. Units-of-work from TANmask, for dadalignerder.',
+        help='output. Units-of-work from HPC.daligner, for daligner.',
     )
     parser.add_argument(
         '--bash-template-fn', default='bash-template.sh',
@@ -776,7 +967,7 @@ def add_daligner_split_arguments(parser):
 def add_daligner_apply_arguments(parser):
     parser.add_argument(
         '--script-fn', required=True,
-        help='input. Script to run dadalignerder.',
+        help='input. Script to run daligner.',
     )
     parser.add_argument(
         '--job-done-fn', default='job.done',
@@ -801,7 +992,7 @@ def add_merge_split_arguments(parser):
     )
     parser.add_argument(
         '--split-fn', default='merge-mask-uows.json',
-        help='output. Units-of-work from TANmask, for damergeder.',
+        help='output. Units-of-work for LAmerge.',
     )
     parser.add_argument(
         '--bash-template-fn', default='bash-template.sh',
@@ -826,24 +1017,6 @@ def add_merge_combine_arguments(parser):
     parser.add_argument(
         '--block2las-fn', required=True,
         help='output. JSON dict of block (int) to las.')
-
-def add_split_arguments(parser):
-    parser.add_argument(
-        '--run-jobs-fn',
-        help='Output. Produced by HPC.daligner.',
-    )
-    parser.add_argument(
-        '--rep-mask-uows-fn', default='rep-mask-uows.json',
-        help='output. Units-of-work for REPmask.',
-    )
-    parser.add_argument(
-        '--daligner-uows-fn', default='daligner-uows.json',
-        help='output. Units-of-work for daligner.',
-    )
-    parser.add_argument(
-        '--las-merge-uows-fn', default='las-merge-uows.json',
-        help='output. Units-of-work for LAmerge.',
-    )
 
 class HelpF(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
@@ -878,6 +1051,10 @@ def parse_args(argv):
     help_tan_split = 'generate units-of-work for datander, via HPC.TANmask'
     help_tan_apply = 'run datander and TANmask as a unit-of-work (according to output of HPC.TANmask), and remove .las files'
     help_tan_combine = 'run Catrack on partial track-files, to produce a "tan" mask'
+    help_rep_split = 'generate units-of-work for REPmask, given earlier HPC.REPmask; daligner and LAmerge have already occurred'
+    help_rep_apply = 'run daligner and REPmask as a unit-of-work (according to output of HPC.REPmask), and remove .las files'
+    help_rep_combine = 'run Catrack on partial track-files, to produce a "rep" mask'
+    help_rep_daligner_split = 'generate units-of-work for daligner, via HPC.REPmask; should be followed by daligner-apply and daligner-combine, then merge-*, then rep-*'
     help_daligner_split = 'generate units-of-work for daligner, via HPC.daligner'
     help_daligner_apply = 'run daligner as a unit-of-work (according to output of HPC.TANmask)'
     help_daligner_combine = 'generate a file of .las files, plus units-of-work for LAmerge (alias for merge-split)'
@@ -917,6 +1094,38 @@ def parse_args(argv):
             help=help_tan_combine)
     add_tan_combine_arguments(parser_tan_combine)
     parser_tan_combine.set_defaults(func=cmd_tan_combine)
+
+    parser_rep_split = subparsers.add_parser('rep-split',
+            formatter_class=HelpF,
+            description=help_rep_split,
+            epilog='',
+            help=help_rep_split)
+    add_rep_split_arguments(parser_rep_split)
+    parser_rep_split.set_defaults(func=cmd_rep_split)
+
+    parser_rep_apply = subparsers.add_parser('rep-apply',
+            formatter_class=HelpF,
+            description=help_rep_apply,
+            epilog='',
+            help=help_rep_apply)
+    add_rep_apply_arguments(parser_rep_apply)
+    parser_rep_apply.set_defaults(func=cmd_rep_apply)
+
+    parser_rep_combine = subparsers.add_parser('rep-combine',
+            formatter_class=HelpF,
+            description=help_rep_combine,
+            epilog='The result will be mostly symlinks, plus new rep-track files. To use these as a mask, subsequent steps will need to add "-mrep".',
+            help=help_rep_combine)
+    add_rep_combine_arguments(parser_rep_combine)
+    parser_rep_combine.set_defaults(func=cmd_rep_combine)
+
+    parser_rep_daligner_split = subparsers.add_parser('rep-daligner-split',
+            formatter_class=HelpF,
+            description=help_rep_daligner_split,
+            epilog='HPC.REPmask will be passed mask flags for any mask tracks which we glob.',
+            help=help_rep_daligner_split)
+    add_rep_daligner_split_arguments(parser_rep_daligner_split)
+    parser_rep_daligner_split.set_defaults(func=cmd_rep_daligner_split)
 
     parser_daligner_split = subparsers.add_parser('daligner-split',
             formatter_class=HelpF,
