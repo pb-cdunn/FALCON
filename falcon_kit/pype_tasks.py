@@ -70,14 +70,17 @@ python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  tan-
 TASK_DB_TAN_COMBINE_SCRIPT = """\
 python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  tan-combine --gathered={input.gathered} --new-db={output.new_db}
 """
-TASK_DB_TAN_SPLIT_SCRIPT = """\
-python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  tan-split --split={output.split} --bash-template={output.bash_template}
+TASK_DB_REP_SPLIT_SCRIPT = """\
+python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  rep-split --las-paths-fn={input.las_paths} --wildcards={params.wildcards} -g{params.group_size} -c{params.coverage_limit} --split={output.split} --bash-template={output.bash_template}
 """
 TASK_DB_REP_APPLY_SCRIPT = """\
 python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  rep-apply --script={input.script} --job-done={output.job_done}
 """
 TASK_DB_REP_COMBINE_SCRIPT = """\
-python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  rep-combine --gathered={input.gathered} --new-db={output.new_db}
+python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  rep-combine -g{params.group_size} --gathered={input.gathered} --new-db={output.new_db}
+"""
+TASK_DB_REP_DALIGNER_SPLIT_SCRIPT = """\
+python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db} --nproc={params.pypeflow_nproc}  rep-daligner-split --wildcards={params.wildcards} --group-size={params.group_size} --coverage-limit={params.coverage_limit} --split-fn={output.split} --bash-template-fn={output.bash_template}
 """
 TASK_DB_DALIGNER_SPLIT_SCRIPT = """\
 python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db} --nproc={params.pypeflow_nproc}  daligner-split --wildcards={params.wildcards} --length-cutoff-fn={input.length_cutoff} --split-fn={output.split} --bash-template-fn={output.bash_template}
@@ -89,7 +92,7 @@ TASK_DB_DALIGNER_COMBINE_SCRIPT = """\
 python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  daligner-combine --gathered={input.gathered} --las-paths-fn={output.las_paths}
 """
 TASK_DB_LAMERGE_SPLIT_SCRIPT = """\
-python -m falcon_kit.mains.dazzler --config={input.config}                  merge-split --db-prefix={params.db_prefix} --las-paths={input.las_paths} --split-fn={output.split} --bash-template-fn={output.bash_template}
+python -m falcon_kit.mains.dazzler --config={input.config}                  merge-split --db-prefix={params.db_prefix} --las-paths={input.las_paths} --wildcards={params.wildcards} --split-fn={output.split} --bash-template-fn={output.bash_template}
 """
 TASK_DB_LAMERGE_APPLY_SCRIPT = """\
 python -m falcon_kit.mains.dazzler --config={input.config}                  merge-apply --las-paths={input.las_paths} --las-fn={output.las_fn}

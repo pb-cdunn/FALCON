@@ -170,6 +170,9 @@ HPC.TANmask -P. {TANmask_opt} -v -f{prefix} {db}
     """.format(**params)
 
 def script_HPC_REPmask(config, db, tracks, prefix, group_size, coverage_limit):
+    if group_size == 0: # TODO: Make this a no-op.
+        group_size = 1
+        coverage_limit = 10**9 # an arbitrary large number
     assert prefix and '/' not in prefix
     params = dict(config)
     params.update(locals())
@@ -215,21 +218,25 @@ def symlink(actual, symbolic=None, force=True):
 
 def symlink_db(db_fn):
     """Symlink everything that could be related to this Dazzler DB.
+    Exact matches will probably cause an exception in symlink().
     """
     db_dirname, db_basename = os.path.split(db_fn)
     dbname = os.path.splitext(db_basename)[0]
 
     fn = os.path.join(db_dirname, dbname + '.db')
     symlink(fn)
-    possible_suffixes = (
-            '.idx', '.bps',
-            '.dust.data', '.dust.anno',
-            '.tan.data', '.tan.anno',
-    )
-    for suffix in possible_suffixes:
-        fn = os.path.join(db_dirname, '.' + dbname + suffix)
+
+    re_suffix = re.compile(r'^\.%s(\.idx|\.bps|\.dust\.data|\.dust\.anno|\.tan\.data|\.tan\.anno|\.rep\d+\.data|\.rep\d+\.anno)$'%dbname)
+    all_basenames = os.listdir(db_dirname)
+    for basename in sorted(all_basenames):
+        mo = re_suffix.search(basename)
+        if not mo:
+            continue
+        fn = os.path.join(db_dirname, basename)
         if os.path.exists(fn):
             symlink(fn)
+        else:
+            LOG.warning('Symlink {!r} seems to be broken.'.format(fn))
     return dbname
 
 def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
@@ -343,10 +350,57 @@ def tan_combine(db_fn, gathered_fn, new_db_fn):
     cmd = 'Catrack -vdf {} tan'.format(db)
     io.syscall(cmd)
 
-def rep_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
+def rep_split(config, config_fn, db_fn, las_paths_fn, wildcards, group_size, coverage_limit, uows_fn, bash_template_fn):
+    """For foo.db, HPC.REPmask would produce rep-jobs.05.MASK lines like this:
+
+    # REPmask jobs (n)
+    REPmask -v -c30 -nrep1 foo foo.R1.@1-3
+    REPmask -v -c30 -nrep1 foo foo.R1.@4-6
+    ...
+
+    (That's for level R1.)
+    We will do one block at-a-time, for simplicity.
+    """
     with open(bash_template_fn, 'w') as stream:
         stream.write(pype_tasks.TASK_DB_REP_APPLY_SCRIPT)
     db = symlink_db(db_fn)
+
+    las_paths = io.deserialize(las_paths_fn)
+
+    scripts = list()
+    for i, las_fn in enumerate(las_paths):
+        las_files = las_fn # one at-a-time
+        script_lines = [
+            #'LAcheck {} {}\n'.format(db, las_files),
+            'REPmask -v -c{} -nrep{} {} {}\n'.format(
+                coverage_limit, group_size, db, las_files),
+            'rm -f {}\n'.format(las_files),
+        ]
+        scripts.append(''.join(script_lines))
+
+    jobs = list()
+    for i, script in enumerate(scripts):
+        job_id = 'rep_{:03d}'.format(i)
+        script_dir = os.path.join('.', 'rep-scripts', job_id)
+        script_fn = os.path.join(script_dir, 'run_REPmask.sh')
+        io.mkdirs(script_dir)
+        with open(script_fn, 'w') as stream:
+            stream.write('{}\n'.format(script))
+        # Record in a job-dict.
+        job = dict()
+        job['input'] = dict(
+                config=config_fn,
+                db=db_fn,
+                script=script_fn,
+        )
+        job['output'] = dict(
+                job_done = 'job.done'
+        )
+        job['params'] = dict(
+        )
+        job['wildcards'] = {wildcards: job_id}
+        jobs.append(job)
+    io.serialize(uows_fn, jobs)
 
 def rep_apply(db_fn, script_fn, job_done_fn):
     # daligner would put track-files in the DB-directory, not '.',
@@ -357,13 +411,13 @@ def rep_apply(db_fn, script_fn, job_done_fn):
     io.syscall('bash -vex {}'.format(os.path.basename(script_fn)))
     io.touch(job_done_fn)
 
-def rep_combine(db_fn, gathered_fn, new_db_fn):
+def rep_combine(db_fn, gathered_fn, group_size, new_db_fn):
     new_db = os.path.splitext(new_db_fn)[0]
     db = symlink_db(db_fn)
     assert db == new_db, 'basename({!r})!={!r}, but old and new DB names must match.'.format(db_fn, new_db_fn)
 
     # Remove old, in case of resume.
-    io.syscall('rm -f .{db}.*.rep.anno .{db}.*.rep.data'.format(db=db))
+    io.syscall('rm -f .{db}.*.rep{group_size}.anno .{db}.*.rep{group_size}.data'.format(**locals()))
 
     gathered = io.deserialize(gathered_fn)
     gathered_dn = os.path.dirname(gathered_fn)
@@ -375,15 +429,71 @@ def rep_combine(db_fn, gathered_fn, new_db_fn):
         if not os.path.isabs(done_dn):
             LOG.info('Found relative done-file: {!r}'.format(done_fn))
             done_dn = os.path.join(gathered_dn, done_dn)
-        annos = glob.glob('{}/.{}.*.rep.anno'.format(done_dn, db))
-        datas = glob.glob('{}/.{}.*.rep.data'.format(done_dn, db))
+        annos = glob.glob('{}/.{}.*.rep{}.anno'.format(done_dn, db, group_size))
+        datas = glob.glob('{}/.{}.*.rep{}.data'.format(done_dn, db, group_size))
         assert len(annos) == len(datas), 'Mismatched globs:\n{!r}\n{!r}'.format(annos, datas)
         for fn in annos + datas:
             symlink(fn, force=False)
-    cmd = 'Catrack -vdf {} rep'.format(db)
+    cmd = 'Catrack -vdf {} rep{}'.format(db, group_size)
     io.syscall(cmd)
 
-def rep_daligner_split(config, config_fn, db_fn, nproc, group_size, coverage_limit, uows_fn, bash_template_fn):
+'''
+daligner -v -k18 -w8 -h480 -e0.8 -P. /localdisk/scratch/cdunn/repo/FALCON-examples/run/greg200k-sv2/0-rawreads/tan-combine/raw_reads /localdisk/scratch/cdunn/repo/FALCON-examples/run/greg200k-sv2/0-rawreads/tan-combine/raw_reads && mv raw_reads.raw_reads.las raw_reads.R1.1.las
+
+'''
+def fake_rep_as_daligner_script_moved(script, dbname):
+    """
+    Special case:
+        # Daligner jobs (1)
+        daligner raw_reads raw_reads && mv raw_reads.raw_reads.las raw_reads.R1.1.las
+    Well, unlike for daligner_split, here the block-number is there for this degenerate case. Good!
+    """
+    """
+    We have db.Rn.block.las
+    We want db.block.las, for now.
+    TODO: What about when there are pairs yet to merge?
+    """
+    re_script = re.compile(r'(mv\b.*\S+\s+)(\S+)$') # no trailing newline, for now
+    mo = re_script.search(script)
+    if not mo:
+        msg = 'Only 1 line in foo-jobs.01.OVL, but\n {!r} did not match\n {!r}.'.format(
+            re_script.pattern, script)
+        LOG.warning(msg)
+        return script
+    else:
+        new_script = re_script.sub(r'\1{dbname}.1.{dbname}.1.las'.format(dbname=dbname), script, 1)
+        msg = 'Only 1 line in foo-jobs.01.OVL:\n {!r} matches\n {!r}. Replacing with\n {!r}.'.format(
+            re_script.pattern, script, new_script)
+        LOG.warning(msg)
+        return new_script
+
+def fake_rep_as_daligner_script_unmoved(script, dbname):
+    """
+    Typical case:
+        # Daligner jobs (N)
+        daligner raw_reads raw_reads && mv raw_reads.3.raw_reads.3.las raw_reads.R1.3.las
+    Well, unlike for daligner_split, here the block-number is there for this degenerate case. Good!
+    """
+    """
+    We have db.Rn.block.las
+    We want db.block.las, for now.
+    TODO: What about when there are pairs yet to merge?
+    """
+    re_script = re.compile(r'\s*\&\&\s*mv\s+.*$') # no trailing newline, for now
+    mo = re_script.search(script)
+    if not mo:
+        msg = 'Many lines in foo-jobs.01.OVL, but\n {!r} did not match\n {!r}.'.format(
+            re_script.pattern, script)
+        LOG.warning(msg)
+        return script
+    else:
+        new_script = re_script.sub('', script, 1)
+        msg = 'Many lines in foo-jobs.01.OVL:\n {!r} matches\n {!r}. Replacing with\n {!r}.'.format(
+            re_script.pattern, script, new_script)
+        LOG.warning(msg)
+        return new_script
+
+def rep_daligner_split(config, config_fn, db_fn, nproc, wildcards, group_size, coverage_limit, uows_fn, bash_template_fn):
     """Similar to daligner_split(), but based on HPC.REPmask instead of HPC.daligner.
     """
     with open(bash_template_fn, 'w') as stream:
@@ -414,11 +524,10 @@ def rep_daligner_split(config, config_fn, db_fn, nproc, group_size, coverage_lim
             continue
         scripts.append(line)
 
-    """
-    Special case:
-        # Daligner jobs (1)
-    TODO: Reconsider someday.
-    """
+    if len(scripts) == 1:
+        scripts = [fake_rep_as_daligner_script_moved(s, dbname) for s in scripts]
+    else:
+        scripts = [fake_rep_as_daligner_script_unmoved(s, dbname) for s in scripts]
 
     for i, script in enumerate(scripts):
         LAcheck = 'LAcheck -vS {} *.las'.format(db)
@@ -445,9 +554,7 @@ def rep_daligner_split(config, config_fn, db_fn, nproc, group_size, coverage_lim
         )
         job['params'] = dict(
         )
-        job['wildcards'] = dict(
-                rep0_id=job_id, # TODO: parameter, since we might have multiple repN
-        )
+        job['wildcards'] = {wildcards: job_id}
         jobs.append(job)
     io.serialize(uows_fn, jobs)
 
@@ -592,19 +699,21 @@ def daligner_combine(db_fn, gathered_fn, las_paths_fn):
             las_paths.extend(las_path_glob)
         n = len(las_paths)
         if not is_perfect_square(n):
-            msg = '{} is not a perfect square. We must be missing some .las files.'.format(n)
-            raise MissingLas(msg)
+            #msg = '{} is not a perfect square. We must be missing some .las files.'.format(n)
+            #raise MissingLas(msg)
+            pass
         return las_paths
     try:
         las_paths = sorted(find_las_paths(), key=lambda fn: os.path.basename(fn))
-    except MissingLas:
-        LOG.info('Not enough .las found from {!r}. Sleeping {} seconds before retrying.'.format(gathered_fn, WAIT))
+    except MissingLas as exc:
+        LOG.info('{}\nNot enough .las found from {!r}. Sleeping {} seconds before retrying.'.format(
+            exc.message, gathered_fn, WAIT))
         time.sleep(WAIT)
         las_paths = find_las_paths()
     io.serialize(las_paths_fn, las_paths)
 
 
-def merge_split(config_fn, dbname, las_paths_fn, split_fn, bash_template_fn):
+def merge_split(config_fn, dbname, las_paths_fn, wildcards, split_fn, bash_template_fn):
     with open(bash_template_fn, 'w') as stream:
         stream.write(pype_tasks.TASK_DB_LAMERGE_APPLY_SCRIPT)
 
@@ -647,9 +756,7 @@ def merge_split(config_fn, dbname, las_paths_fn, split_fn, bash_template_fn):
         )
         job['params'] = dict(
         )
-        job['wildcards'] = dict(
-                mer0_id=job_id,
-        )
+        job['wildcards'] = {wildcards: job_id}
         jobs.append(job)
     io.serialize(split_fn, jobs)
 
@@ -790,16 +897,21 @@ def cmd_tan_combine(args):
     tan_combine(args.db_fn, args.gathered_fn, args.new_db_fn)
 def cmd_rep_split(args):
     ours = get_ours(args.config_fn, args.db_fn)
-    rep_split(ours, args.config_fn, args.db_fn, args.split_fn, args.bash_template_fn)
+    rep_split(
+            ours, args.config_fn, args.db_fn,
+            args.las_paths_fn, args.wildcards,
+            args.group_size, args.coverage_limit,
+            args.split_fn, args.bash_template_fn,
+    )
 def cmd_rep_apply(args):
     rep_apply(args.db_fn, args.script_fn, args.job_done_fn)
 def cmd_rep_combine(args):
-    rep_combine(args.db_fn, args.gathered_fn, args.new_db_fn)
+    rep_combine(args.db_fn, args.gathered_fn, args.group_size, args.new_db_fn)
 def cmd_rep_daligner_split(args):
     ours = get_ours(args.config_fn, args.db_fn)
     rep_daligner_split(
             ours, args.config_fn, args.db_fn, args.nproc,
-            args.group_size, args.coverage_limit,
+            args.wildcards, args.group_size, args.coverage_limit,
             args.split_fn, args.bash_template_fn,
     )
 def cmd_daligner_split(args):
@@ -814,7 +926,11 @@ def cmd_daligner_apply(args):
 def cmd_daligner_combine(args):
     daligner_combine(args.db_fn, args.gathered_fn, args.las_paths_fn)
 def cmd_merge_split(args):
-    merge_split(args.config_fn, args.db_prefix, args.las_paths_fn, args.split_fn, args.bash_template_fn)
+    merge_split(
+            args.config_fn, args.db_prefix, args.las_paths_fn,
+            args.wildcards,
+            args.split_fn, args.bash_template_fn,
+    )
 def cmd_merge_apply(args):
     merge_apply(args.las_paths_fn, args.las_fn)
 def cmd_merge_combine(args):
@@ -827,6 +943,7 @@ For raw_reads.db, we also look for the following config keys:
 - pa_DBsplit_option
 - pa_HPCdaligner_option
 - pa_HPCTANmask_option
+- pa_daligner_option
 - length_cutoff: -1 => calculate based on "genome_size" and "seed_coverage" config.
 - seed_coverage
 - genome_size
@@ -835,7 +952,7 @@ For preads.db, these are named:
 
 - ovlp_DBsplit_option
 - ovlp_HPCdaligner_option
-- ovlp_HPCTANmask_option
+- ovlp_daligner_option
 - length_cutoff_pr
 """
 
@@ -846,13 +963,13 @@ def get_ours(config_fn, db_fn):
     ours['seed_coverage'] = float(config['seed_coverage'])
     if os.path.basename(db_fn).startswith('preads'):
         ours['DBsplit_opt'] = config.get('ovlp_DBsplit_option', '')
-        ours['daligner_opt'] = config.get('ovlp_HPCdaligner_option', '')
-        ours['TANmask_opt'] = config.get('ovlp_HPCTANmask_option', '')
+        ours['daligner_opt'] = config.get('ovlp_daligner_option', '') + ' ' + config.get('ovlp_HPCdaligner_option', '')
         ours['user_length_cutoff'] = int(config.get('length_cutoff_pr', '0'))
     else:
         ours['DBsplit_opt'] = config.get('pa_DBsplit_option', '')
-        ours['daligner_opt'] = config.get('pa_HPCdaligner_option', '')
-        ours['TANmask_opt'] = config.get('pa_HPCTANmask_option', '')
+        ours['daligner_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCdaligner_option', '')
+        ours['TANmask_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCTANmask_option', '')
+        ours['REPmask_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCREPmask_option', '')
         ours['user_length_cutoff'] = int(config.get('length_cutoff', '0'))
 
     LOG.info('config({!r}):\n{}'.format(config_fn, config))
@@ -897,12 +1014,21 @@ def add_tan_combine_arguments(parser):
     )
 def add_rep_split_arguments(parser):
     parser.add_argument(
+        '--wildcards', #default='rep1_id',
+        help='Comma-separated string of keys to be subtituted into output paths for each job, if any. (Helps with snakemake and pypeflow; not needed in pbsmrtpipe, since outputs are pre-determined.)',
+    )
+    parser.add_argument(
         '--group-size', '-g', required=True, type=int,
         help='Number of blocks per group. This should match what was passed to HPC.REPmask. Here, it becomes part of the mask name, repN.',
     )
     parser.add_argument(
         '--coverage-limit', '-c', required=True, type=int,
         help='Coverage threshold for masking.',
+    )
+    parser.add_argument(
+        '--las-paths-fn', required=True,
+        help='input. JSON list of las paths. These will have the format of standard daligner/LAmerge (foo.N.las), rather than of REPmask (foo.R1.N.las).',
+        # so we will symlink as we use? (TODO: Also delete after use?)
     )
     parser.add_argument(
         '--split-fn', default='rep-mask-uows.json',
@@ -923,6 +1049,10 @@ def add_rep_apply_arguments(parser):
     )
 def add_rep_combine_arguments(parser):
     parser.add_argument(
+        '--group-size', '-g', required=True, type=int,
+        help='Number of blocks per group. This should match what was passed to HPC.REPmask. Here, it becomes part of the mask name, repN.',
+    )
+    parser.add_argument(
         '--gathered-fn', required=True,
         help='input. List of sentinels. Produced by gen_parallel_tasks() gathering. The rep-track files are next to these.',
     )
@@ -931,6 +1061,10 @@ def add_rep_combine_arguments(parser):
         help='output. This must match the input DB name. It will be symlinked, except the new track files.',
     )
 def add_rep_daligner_split_arguments(parser):
+    parser.add_argument(
+        '--wildcards', default='dummy_wildcard',
+        help='Comma-separated string of keys to be subtituted into output paths for each job, if any. (Helps with snakemake and pypeflow; not needed in pbsmrtpipe, since outputs are pre-determined.)',
+    )
     parser.add_argument(
         '--group-size', '-g', required=True, type=int,
         help='Number of blocks per group. This should match what was passed to HPC.REPmask. Here, it becomes part of the mask name, repN.',
@@ -982,6 +1116,10 @@ def add_daligner_combine_arguments(parser):
         '--las-paths-fn', required=True,
         help='output. JSON list of las paths.')
 def add_merge_split_arguments(parser):
+    parser.add_argument(
+        '--wildcards', default='mer0_id',
+        help='Comma-separated string of keys to be subtituted into output paths for each job, if any. (Helps with snakemake and pypeflow; not needed in pbsmrtpipe, since outputs are pre-determined.)',
+    )
     parser.add_argument(
         '--db-prefix', required=True,
         help='DB is named "prefix.db", and the prefix is expected to match .las files',

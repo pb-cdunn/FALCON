@@ -11,7 +11,7 @@ import collections
 import logging
 import re
 
-#LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 def _verify_pairs(pairs1, pairs2):
@@ -510,3 +510,37 @@ def toLowerDict(cfg):
                 raise Exception(msg)
         low[k] = v
     return low
+
+
+def parse_REPmask_code(code):
+    """
+    Return list of 3 (group_size, coverage_limit) pairs.
+
+    group_size==0 indicates "no-op".
+    Otherwise, super-high coverage_limit indicates "do work, but produce empty mask-track".
+
+    >>> parse_REPmask_code('1,10;2,20;3,300')
+    [(1, 10), (2, 20), (3, 300)]
+    """
+    ec = 0 # arbitrary
+    result = [(0, ec), (0, ec), (0, ec)] # all no-op by default
+    try:
+        pairs = code.split(';')
+        assert len(pairs) <= 3
+        for i, p in enumerate(pairs):
+            g, c = map(int, p.split(','))
+            result[i] = (g, c)
+    except Exception as exc:
+        LOG.exception('Failed to parse REPmask_code {!r}. Using extreme, to produce empty rep tracks.'.format(code))
+    # Validate
+    paira = result[0]
+    pairb = result[1]
+    pairc = result[2]
+    if (paira[0] != 0 and pairb[0] != 0 and pairc[0] != 0):
+        # Check only if all groups are non-zero. Otherwise, the user must know what they're doing.
+        if (paira[0] == pairb[0] or
+            pairb[0] == pairc[0]):
+            raise Exception('Non-zero group sizes must not match in parsed REPmask_code: {!r} from {!r}'.format(result, code))
+        if (paira[0] > pairb[0] or pairb[0] > pairc[0]):
+            raise Exception('Non-zero group sizes must increase monotonically in parsed REPmask_code: {!r} from {!r}'.format(result, code))
+    return result
