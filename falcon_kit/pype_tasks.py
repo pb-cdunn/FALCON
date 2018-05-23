@@ -70,6 +70,15 @@ python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  tan-
 TASK_DB_TAN_COMBINE_SCRIPT = """\
 python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  tan-combine --gathered={input.gathered} --new-db={output.new_db}
 """
+TASK_DB_TAN_SPLIT_SCRIPT = """\
+python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  tan-split --split={output.split} --bash-template={output.bash_template}
+"""
+TASK_DB_REP_APPLY_SCRIPT = """\
+python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  rep-apply --script={input.script} --job-done={output.job_done}
+"""
+TASK_DB_REP_COMBINE_SCRIPT = """\
+python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db}  rep-combine --gathered={input.gathered} --new-db={output.new_db}
+"""
 TASK_DB_DALIGNER_SPLIT_SCRIPT = """\
 python -m falcon_kit.mains.dazzler --config={input.config} --db={input.db} --nproc={params.pypeflow_nproc}  daligner-split --wildcards={params.wildcards} --length-cutoff-fn={input.length_cutoff} --split-fn={output.split} --bash-template-fn={output.bash_template}
 """
