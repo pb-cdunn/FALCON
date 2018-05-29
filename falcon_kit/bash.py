@@ -395,7 +395,7 @@ time python -m falcon_kit.mains.ovlp_to_graph {fc_ovlp_to_graph_option} --overla
 time python -m falcon_kit.mains.graph_to_contig
 
 # Given a_ctg_all.fa, write a_ctg.fa:
-time python -m falcon_kit.mains.dedup_a_tigs
+time python -m falcon_kit.mains.dedup_a_tigs >| a_ctg.fa
 
 # Given a_ctg.fa and a_ctg_all_tiling_path, write a_ctg_tiling_path:
 time python -m falcon_kit.mains.dedup_a_tp >| a_ctg_tiling_path

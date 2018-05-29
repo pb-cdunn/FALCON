@@ -36,6 +36,9 @@ def get_aln_data(t_seq, q_seq):
 
         s1, e1, s2, e2 = aln_range.s1, aln_range.e1, aln_range.s2, aln_range.e2
 
+        log('Mapped (q, s1 = {}, e1 = {}, len1 = {}, (e1 - s1) = {}, t, s2 = {}, e2 = {}, (e2 - s2) = {}, len2 = {})'.format(
+                s1, e1, e1 - s1, len(q_seq), s2, e2, e2 - s2, len(t_seq)))
+
         max_len = 250000 # to keep allocations < 16GB, given band_tol=1500
         if (e1 - s1) >= max_len or (e2 - s2) >= max_len:
             # DW.align() would crash, so raise here.
@@ -44,8 +47,8 @@ def get_aln_data(t_seq, q_seq):
             raise TooLongError('q_len={} or t_len={} are too big, over 500k'.format(
                 (e1-s1), (e2-s2)))
         if e1 - s1 > 100:
-            log('Calling DW_banded.align(q, {}, t, {}, 1500, 1)'.format(
-                e1-s1, e2-s2))
+            log('Calling DW_banded.align(q, s1 = {}, e1 = {}, len1 = {}, (e1 - s1) = {}, t, s2 = {}, e2 = {}, (e2 - s2) = {}, len2 = {})'.format(
+                s1, e1, e1 - s1, len(q_seq), s2, e2, e2 - s2, len(t_seq)))
             alignment = DWA.align(q_seq[s1:e1], e1 - s1,
                                   seq0[s2:e2], e2 - s2,
                                   1500, 1)
@@ -66,13 +69,13 @@ def get_aln_data(t_seq, q_seq):
     kup.free_seq_addr_array(sda_ptr)
     return aln_data #, x, y
 
-def get_aln_results(ref_seq, query_seq):
+def get_aln_results(ref_seq, query_seq, min_seq_len):
     # Align the a_ctg against the base.
     log('Aligning: len(ref_seq) = %d, len(query_seq) = %d' % (len(ref_seq), len(query_seq)))
     delta_len = len(query_seq) - len(ref_seq)
     idt = 0.0
     cov = 0.0
-    if len(ref_seq) > 2000 and len(query_seq) > 2000:
+    if len(ref_seq) > min_seq_len and len(query_seq) > min_seq_len:
         try:
             aln_data = get_aln_data(ref_seq, query_seq)
             if len(aln_data) != 0:
@@ -81,8 +84,10 @@ def get_aln_results(ref_seq, query_seq):
                 cov = 1.0 * \
                     (aln_data[-1][3] - aln_data[-1]
                         [2]) / aln_data[-1][4]
+            else:
+                log('len(aln_data) == 0!')
         except TooLongError:
-            log('WARNING: Seqs were too long for get_aln_data(), so we set idt/cov low enough to prevent filtering by dedup_a_tigs. len(ref_seq) = %d, len(query_seq) = %d'.format(len(ref_seq), len(query_seq)))
+            log('WARNING: Seqs were too long for get_aln_data(), so we set idt/cov low enough to prevent filtering by dedup_a_tigs. len(ref_seq) = {}, len(query_seq) = {}'.format(len(ref_seq), len(query_seq)))
             idt = -1.0
             cov = -1.0
     return delta_len, idt, cov
@@ -108,7 +113,7 @@ def yield_single_compound(fp_in):
         ret.append(r)
     yield ret
 
-def filter_duplicate(compound_a_ctg, max_idt, max_aln_cov, min_len_diff, ploidy):
+def filter_duplicate(compound_a_ctg, max_idt, max_aln_cov, min_len_diff, min_seq_len, ploidy):
     """
     Takes a list of a_ctg sequences in a compound unitig (bubble) which need
     to be deduplicated according to the parameters.
@@ -116,11 +121,11 @@ def filter_duplicate(compound_a_ctg, max_idt, max_aln_cov, min_len_diff, ploidy)
     already part of the primary path by definition, and will not be output.
     """
 
-    # Sanity check.
-    if len(compound_a_ctg) == 0:
-        return []
-
     ret = []
+
+    # Sanity check.
+    if len(compound_a_ctg) == 0: return ret # pragma: no cover
+
     ref_seqs = [compound_a_ctg[0]]
 
     # Zeroth sequence is the base seq.
@@ -143,7 +148,7 @@ def filter_duplicate(compound_a_ctg, max_idt, max_aln_cov, min_len_diff, ploidy)
             log('[i = %d, j = %d] Comparing: query "%s" vs ref "%s".' % (i, j, a_ctg_id, ref_ctg_id))
 
             # Align.
-            delta_l, idt, cov = get_aln_results(ref_seq, a_ctg_seq)
+            delta_l, idt, cov = get_aln_results(ref_seq, a_ctg_seq, min_seq_len)
 
             # Round to the floor of 2 decimal places. Needed to reproduce
             # old behaviour.
@@ -174,36 +179,39 @@ def filter_duplicate(compound_a_ctg, max_idt, max_aln_cov, min_len_diff, ploidy)
 
     return ret
 
-def run(max_idt, max_aln_cov, min_len_diff, ploidy):
-    with open_fasta_reader("a_ctg_all.fa") as fp_in, \
-         open("a_ctg.fa", "w") as fp_out:
+def run(fp_out, fp_in, max_idt, max_aln_cov, min_len_diff, min_seq_len, ploidy):
+    for compound_a_ctg in yield_single_compound(fp_in):
+        filtered_a_ctg = filter_duplicate(compound_a_ctg, max_idt, max_aln_cov, min_len_diff, min_seq_len, ploidy)
 
-        for compound_a_ctg in yield_single_compound(fp_in):
-            filtered_a_ctg = filter_duplicate(compound_a_ctg, max_idt, max_aln_cov, min_len_diff, ploidy)
-
-            for a_ctg, new_header in filtered_a_ctg:
-                fp_out.write('>%s\n' % (new_header))
-                fp_out.write(a_ctg.sequence)
-                fp_out.write('\n')
+        for a_ctg, new_header in filtered_a_ctg:
+            fp_out.write('>%s\n' % (new_header))
+            fp_out.write(a_ctg.sequence)
+            fp_out.write('\n')
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description='Removes duplicate a-tig, iff *all* conditions are violated. Assumes the working directory has the a_ctg_all.fa file, and produces a_ctg.fa',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--max-idt', type=int,
-                        help="keep a-tig if the identity (in %) to the primary contig is <= max_idt", default=96)
+                        help="Keep a-tig if the identity (in %%) to the primary contig is <= max_idt", default=96)
     parser.add_argument('--max-aln-cov', type=int,
-                        help="keep a-tig if the alignment coverage (in %) on the a-tig is <= max_aln_cov", default=97)
+                        help="Keep a-tig if the alignment coverage (in %%) on the a-tig is <= max_aln_cov", default=97)
     parser.add_argument('--min-len-diff', type=int,
-                        help="keep a-tig if the length different > min_len_diff", default=500)
+                        help="Keep a-tig if the length different > min_len_diff", default=500)
+    parser.add_argument('--min-seq-len', type=int,
+                        help="Branches with length less than this threshold will always be deduplicated.", default=2000)
     parser.add_argument('--ploidy', type=int,
                         help="For a diplid genome, 2 branches per SV are expected. This parameter limits the number of pairwise comparison. If <= 0, this threshold is not applied.", default=2)
+    parser.add_argument('--a-ctg-all', type=str,
+                        help="Input set of all associate contigs for deduplication.", default="a_ctg_all.fa")
 
     args = parser.parse_args(argv[1:])
     return args
 
 def main(argv=sys.argv):
     args = parse_args(argv)
-    run(args.max_idt, args.max_aln_cov, args.min_len_diff, args.ploidy)
 
-if __name__ == "__main__":
-    main(sys.argv)
+    with open_fasta_reader(args.a_ctg_all) as fp_in:
+        run(sys.stdout, fp_in, args.max_idt, args.max_aln_cov, args.min_len_diff, args.min_seq_len, args.ploidy)
+
+if __name__ == "__main__":  # pragma: no cover
+    main(sys.argv)          # pragma: no cover

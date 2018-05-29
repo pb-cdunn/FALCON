@@ -5,10 +5,6 @@ from falcon_kit.FastaReader import open_fasta_reader
 import argparse
 import sys
 
-def log(msg):
-    sys.stderr.write(msg)
-    sys.stderr.write('\n')
-
 def load_headers(fp_in):
     """
     Loads all a_ctg IDs from the a_ctg.fa, which is already deduplicated.
@@ -26,8 +22,8 @@ def run(fp_out, a_ctg, a_ctg_all_tiling_path):
     with open(a_ctg_all_tiling_path, 'r') as fp_in:
         for line in fp_in:
             line = line.strip()
-            if len(line) == 0:
-                continue
+            if len(line) == 0:  # pragma: no cover
+                continue        # pragma: no cover
             sl = line.split()
             if sl[0] not in a_ctg_ids:
                 continue
@@ -48,5 +44,5 @@ def main(argv=sys.argv):
     args = parse_args(argv)
     run(sys.stdout, **vars(args))
 
-if __name__ == "__main__":
-    main(sys.argv)
+if __name__ == "__main__":  # pragma: no cover
+    main(sys.argv)          # pragma: no cover
