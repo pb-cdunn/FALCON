@@ -17,7 +17,7 @@ install-edit:
 install: wheel
 	pip -v install --user --use-wheel --find-links=dist/ .
 pylint:
-	pylint --errors-only falcon_kit/
+	pylint --extension-pkg-whitelist=edlib --errors-only falcon_kit/
 test:
 	python -c 'import falcon_kit; print falcon_kit.falcon'
 	which py.test || pip install --user pytest

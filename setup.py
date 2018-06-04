@@ -12,6 +12,7 @@ install_requires = [
     #"logging_tree",
     #"pbcore >= 0.6.3",
     "pypeFLOW >= 2.0.0",
+    "edlib",
 ]
 
 scripts = []

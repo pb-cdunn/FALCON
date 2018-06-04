@@ -70,7 +70,7 @@ def get_aln_data(t_seq, q_seq):
 
 def get_aln_results(ref_seq, query_seq, min_seq_len):
     # Align the a_ctg against the base.
-    log('Aligning: len(ref_seq) = %d, len(query_seq) = %d' % (len(ref_seq), len(query_seq)))
+    log('Aligning (DW): len(ref_seq) = %d, len(query_seq) = %d' % (len(ref_seq), len(query_seq)))
     delta_len = len(query_seq) - len(ref_seq)
     idt = 0.0
     cov = 0.0

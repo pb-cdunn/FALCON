@@ -4,7 +4,8 @@ from __future__ import print_function
 from falcon_kit.FastaReader import open_fasta_reader
 import argparse
 import sys
-import falcon_kit.align_dw as align
+# import falcon_kit.align_dw as align
+import falcon_kit.align_edlib as align
 
 class TooLongError(Exception): pass
 
