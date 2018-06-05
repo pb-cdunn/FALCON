@@ -58,11 +58,8 @@ def test_main_1(tmpdir, capsys):
 
 def test_main_2(tmpdir, capsys):
     """
-    Test deduplication on very large sequences. This is supposed to test the
-    heuristic of not-aligning very long sequences due to quadratic memory consumption
-    of the current alignment procedure.
-    Once the alignment approach is updated to support long sequences, this test
-    should be updated to expect empty output (because the sequences are identical).
+    Aligning very long sequences should work fine with linear-memory aligners (e.g. Edlib).
+    Using the legacy alignment (align_dw.py) would fail on this test.
     """
 
     random.seed(1234567)
@@ -87,15 +84,7 @@ def test_main_2(tmpdir, capsys):
     mod.main(argv)
     out, err = capsys.readouterr()
 
-    # The base sequence should never be output, and the "01" sequence should
-    # ideally be deduplicated because it's identical to "00".
-    # However, due to the quadratic memory in the current alignment implementation,
-    # there is a max len threshold for alignment. If the sequences are longer
-    # than this threshold, alignment and deduplication will be skipped, and the
-    # associate contig output.
-    # TODO: Once the alignment is updated to have linear memory, the `expected`
-    # should be an empty string.
-    expected = '>000000F-001-01 000000123:E 000000078:E 46974 1268418 33 0 -1.00 -1.00\n' + fasta_lines[3] + '\n'
+    expected = ''
 
     assert(out == expected)
 
@@ -147,45 +136,13 @@ def test_main_3(tmpdir, capsys):
 
 def test_main_4(tmpdir, capsys):
     """
-    The DW alignment has a 100bp minimum distance threshold for (e1 - s1) and (e2 - s2).
-    """
-
-    random.seed(1234567)
-
-    # Generate a dummy sequence.
-    dummy_seq = ''.join([random.choice('ACTG') for i in xrange(90)])
-    fasta_lines = [
-                    # Base sequence.
-                    '>000000F-001-00 000000217:E 000000056:E 46974 1268418 33 0 1.00 1.00',
-                    dummy_seq,
-                    # Exactly the same sequence as a duplicate branch.
-                    '>000000F-001-01 000000123:E 000000078:E 46974 1268418 33 0 1.00 1.00',
-                    dummy_seq
-                  ]
-
-    expected_lines = [
-                    '>000000F-001-01 000000123:E 000000078:E 46974 1268418 33 0 0.00 0.00',
-                    dummy_seq,
-                  ]
-
-    # Create a temporary a_ctg_all.fa file.
-    test_out_a_ctg_all_file = tmpdir.join('a_ctg_all.fa')
-    test_out_a_ctg_all_file.write('\n'.join(fasta_lines))
-
-    argv = ['prog',
-            '--a-ctg-all', str(test_out_a_ctg_all_file),
-            '--min-seq-len', '50',
-            ]
-    mod.main(argv)
-    out, err = capsys.readouterr()
-
-    expected = '\n'.join(expected_lines) + '\n'
-
-    assert(out == expected)
-
-def test_main_5(tmpdir, capsys):
-    """
     Align two completely different sequences.
+    The legacy alignment (align_dw.py) would fail on this test, as it would
+    (unsuccessfuly) try to map one sequence to another, and then align
+    in that range. Since the sequences are completely different,
+    such mapping wouldn't be possible.
+    However, the sequences should globally be aligned (coverage 1.00), with identity 0.00.
+    The align_edlib.py returns the correct expected result.
     """
 
     random.seed(1234567)
