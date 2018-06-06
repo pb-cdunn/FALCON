@@ -29,13 +29,8 @@ import networkx as nx
 #from pbcore.io import FastaReader
 from ..FastaReader import open_fasta_reader
 from ..io import open_progress
-from falcon_kit import kup, falcon, DWA
 
 RCMAP = dict(zip("ACGTacgtNn-", "TGCAtgcaNn-"))
-
-
-class TooLongError(Exception): pass
-
 
 def log(msg):
     sys.stderr.write(msg)
@@ -45,62 +40,6 @@ def log(msg):
 def rc(seq):
     return "".join([RCMAP[c] for c in seq[::-1]])
 
-
-def get_aln_data(t_seq, q_seq):
-    aln_data = []
-    #x = []
-    #y = []
-    K = 8
-    seq0 = t_seq
-    lk_ptr = kup.allocate_kmer_lookup(1 << (K * 2))
-    sa_ptr = kup.allocate_seq(len(seq0))
-    sda_ptr = kup.allocate_seq_addr(len(seq0))
-    kup.add_sequence(0, K, seq0, len(seq0), sda_ptr, sa_ptr, lk_ptr)
-    q_id = "dummy"
-
-    kmer_match_ptr = kup.find_kmer_pos_for_seq(
-        q_seq, len(q_seq), K, sda_ptr, lk_ptr)
-    kmer_match = kmer_match_ptr[0]
-
-    if kmer_match.count != 0:
-        aln_range_ptr = kup.find_best_aln_range(kmer_match_ptr, K, K * 5, 12)
-        aln_range = aln_range_ptr[0]
-        #x, y = list(zip(* [(kmer_match.query_pos[i], kmer_match.target_pos[i])
-        #              for i in range(kmer_match.count)]))
-
-        s1, e1, s2, e2 = aln_range.s1, aln_range.e1, aln_range.s2, aln_range.e2
-
-        max_len = 250000 # to keep allocations < 16GB, given band_tol=1500
-        if (e1 - s1) >= max_len or (e2 - s2) >= max_len:
-            # DW.align() would crash, so raise here.
-            # (500000 is the approx. upper bound for int overflow,
-            #  but some users run out of memory anyway.)
-            raise TooLongError('q_len={} or t_len={} are too big, over 500k'.format(
-                (e1-s1), (e2-s2)))
-        if e1 - s1 > 100:
-            log('Calling DW_banded.align(q, {}, t, {}, 1500, 1)'.format(
-                e1-s1, e2-s2))
-            alignment = DWA.align(q_seq[s1:e1], e1 - s1,
-                                  seq0[s2:e2], e2 - s2,
-                                  1500, 1)
-
-            if alignment[0].aln_str_size > 100:
-                aln_data.append((q_id, 0, s1, e1, len(q_seq), s2, e2, len(
-                    seq0), alignment[0].aln_str_size, alignment[0].dist))
-                aln_str1 = alignment[0].q_aln_str
-                aln_str0 = alignment[0].t_aln_str
-
-            DWA.free_alignment(alignment)
-
-        kup.free_aln_range(aln_range_ptr)
-
-    kup.free_kmer_match(kmer_match_ptr)
-    kup.free_kmer_lookup(lk_ptr)
-    kup.free_seq_array(sa_ptr)
-    kup.free_seq_addr_array(sda_ptr)
-    return aln_data #, x, y
-
-
 def reverse_end(node_id):
     node_id, end = node_id.split(":")
     new_end = "B" if end == "E" else "E"
@@ -108,18 +47,39 @@ def reverse_end(node_id):
 
 
 def yield_first_seq(one_path_edges, seqs):
-            if one_path_edges and one_path_edges[0][0] != one_path_edges[-1][1]:
-                # If non-empty, and non-circular,
-                # prepend the entire first read.
-                (vv, ww) = one_path_edges[0]
-                (vv_rid, vv_letter) = vv.split(":")
-                if vv_letter == 'E':
-                    first_seq = seqs[vv_rid]
-                else:
-                    assert vv_letter == 'B'
-                    first_seq = "".join([RCMAP[c] for c in seqs[vv_rid][::-1]])
-                yield first_seq
+    if one_path_edges and one_path_edges[0][0] != one_path_edges[-1][1]:
+        # If non-empty, and non-circular,
+        # prepend the entire first read.
+        (vv, ww) = one_path_edges[0]
+        (vv_rid, vv_letter) = vv.split(":")
+        if vv_letter == 'E':
+            first_seq = seqs[vv_rid]
+        else:
+            assert vv_letter == 'B'
+            first_seq = "".join([RCMAP[c] for c in seqs[vv_rid][::-1]])
+        yield first_seq
 
+def compose_ctg(seqs, edge_data, ctg_id, path_edges, proper_ctg):
+    total_score = 0
+    total_length = 0
+    edge_lines = []
+    sub_seqs = []
+
+    # If required, add the first read to the path sequence.
+    if proper_ctg:
+        sub_seqs = list(yield_first_seq(path_edges, seqs))
+        total_length = 0 if len(sub_seqs) == 0 else len(sub_seqs[0])
+
+    # Splice-in the rest of the path sequence.
+    for vv, ww in path_edges:
+        rid, s, t, aln_score, idt, e_seq = edge_data[(vv, ww)]
+        sub_seqs.append(e_seq)
+        edge_lines.append('%s %s %s %s %d %d %d %0.2f' % (
+            ctg_id, vv, ww, rid, s, t, aln_score, idt))
+        total_length += abs(s - t)
+        total_score += aln_score
+
+    return edge_lines, sub_seqs, total_score, total_length
 
 def run(improper_p_ctg, proper_a_ctg, preads_fasta_fn, sg_edges_list_fn, utg_data_fn, ctg_paths_fn):
     """improper==True => Neglect the initial read.
@@ -193,10 +153,8 @@ def run(improper_p_ctg, proper_a_ctg, preads_fasta_fn, sg_edges_list_fn, utg_dat
 
     p_ctg_out = open("p_ctg.fa", "w")
     a_ctg_out = open("a_ctg_all.fa", "w")
-    a_ctg_base_out = open("a_ctg_base.fa", "w")
     p_ctg_t_out = open("p_ctg_tiling_path", "w")
-    a_ctg_t_out = open("a_ctg_tiling_path", "w")
-    a_ctg_base_t_out = open("a_ctg_base_tiling_path", "w")
+    a_ctg_t_out = open("a_ctg_all_tiling_path", "w")
     layout_ctg = set()
 
     with open_progress(ctg_paths_fn) as f:
@@ -267,9 +225,11 @@ def run(improper_p_ctg, proper_a_ctg, preads_fasta_fn, sg_edges_list_fn, utg_dat
                             break
                         # if len(shortest_path) < 2:
                         #    break
+                    # Is sorting required, if we are appending the shortest paths in order?
                     all_alt_path.sort()
                     all_alt_path.reverse()
                     shortest_path = all_alt_path[0][1]
+                    # The longest branch in the compound unitig is added to the primary path.
                     if len(one_path) != 0:
                         one_path.extend(shortest_path[1:])
                     else:
@@ -282,113 +242,64 @@ def run(improper_p_ctg, proper_a_ctg, preads_fasta_fn, sg_edges_list_fn, utg_dat
 
             one_path_edges = list(zip(one_path[:-1], one_path[1:]))
 
-            if improper_p_ctg:
-                sub_seqs = []
-            else:
-                sub_seqs = list(yield_first_seq(one_path_edges, seqs))
-            for vv, ww in one_path_edges:
-                rid, s, t, aln_score, idt, e_seq = edge_data[(vv, ww)]
-                sub_seqs.append(e_seq)
-                print("%s %s %s %s %d %d %d %0.2f" % (
-                    ctg_id, vv, ww, rid, s, t, aln_score, idt), file=p_ctg_t_out)
-            print(">%s %s %s %d %d" % (
-                ctg_id, ctg_label, c_type_, total_length, total_score), file=p_ctg_out)
-            print("".join(sub_seqs), file=p_ctg_out)
+            # Compose the primary contig.
+            p_edge_lines, p_ctg_seq_chunks, p_total_score, p_total_length = compose_ctg(seqs, edge_data, ctg_id, one_path_edges, (not improper_p_ctg))
 
-            a_id = 1
-            for v, w, in a_ctg_group:
-                # get the base sequence used in the primary contig
+            # Write out the tiling path.
+            p_ctg_t_out.write('\n'.join(p_edge_lines))
+            p_ctg_t_out.write('\n')
+
+            # Write the sequence.
+            # Using the `total_score` instead of `p_total_score` intentionally. Sum of
+            # edge scores is not identical to sum of unitig scores.
+            p_ctg_out.write('>%s %s %s %d %d\n' % (ctg_id, ctg_label, c_type_, p_total_length, total_score))
+            p_ctg_out.write(''.join(p_ctg_seq_chunks))
+            p_ctg_out.write('\n')
+
+            a_id = 0
+            for v, w in a_ctg_group:
                 atig_output = []
 
-                score, atig_path = a_ctg_group[(v, w)][0]
-                atig_path_edges = list(zip(atig_path[:-1], atig_path[1:]))
-                if not proper_a_ctg:
-                    sub_seqs = []
-                else:
-                    sub_seqs = list(yield_first_seq(atig_path_edges, seqs))
-                total_length = 0
-                total_score = 0
-                for vv, ww in atig_path_edges:
-                    rid, s, t, aln_score, idt, e_seq = edge_data[(vv, ww)]
-                    sub_seqs.append(e_seq)
-                    total_length += abs(s - t)
-                    total_score += aln_score
-
-                base_seq = "".join(sub_seqs)
-                atig_output.append(
-                    (v, w, atig_path, total_length, total_score, base_seq, atig_path_edges, 0, 1, 1))
-
-                for score, atig_path in a_ctg_group[(v, w)][1:]:
+                # Compose the base sequence.
+                for sub_id in xrange(len(a_ctg_group[(v, w)])):
+                    score, atig_path = a_ctg_group[(v, w)][sub_id]
                     atig_path_edges = list(zip(atig_path[:-1], atig_path[1:]))
-                    if not proper_a_ctg:
-                        sub_seqs = []
-                    else:
-                        sub_seqs = list(yield_first_seq(atig_path_edges, seqs))
-                    total_length = 0
-                    total_score = 0
-                    for vv, ww in atig_path_edges:
-                        rid, s, t, aln_score, idt, e_seq = edge_data[(vv, ww)]
-                        sub_seqs.append(e_seq)
-                        total_length += abs(s - t)
-                        total_score += aln_score
 
-                    seq = "".join(sub_seqs)
+                    a_ctg_id = '%s-%03d-%02d' % (ctg_id, a_id + 1, sub_id)
+                    a_edge_lines, sub_seqs, a_total_score, a_total_length = compose_ctg(
+                        seqs, edge_data, a_ctg_id, atig_path_edges, proper_a_ctg)
 
-                    delta_len = len(seq) - len(base_seq)
-                    idt = 0.0
-                    cov = 0.0
-                    if len(base_seq) > 2000 and len(seq) > 2000:
-                        try:
-                          aln_data = get_aln_data(base_seq, seq)
-                          if len(aln_data) != 0:
-                            idt = 1.0 - 1.0 * \
-                                aln_data[-1][-1] / aln_data[-1][-2]
-                            cov = 1.0 * \
-                                (aln_data[-1][3] - aln_data[-1]
-                                 [2]) / aln_data[-1][4]
-                        except TooLongError:
-                            log('WARNING: Seqs were too long for get_aln_data(), so we set idt/cov low enough to prevent filtering by dedup_a_tigs, at atig_path[:-1] == {}'.format(atig_path[:-1]))
-                            idt = -1.0
-                            cov = -1.0
+                    seq = ''.join(sub_seqs)
 
-                    atig_output.append(
-                        (v, w, atig_path, total_length, total_score, seq, atig_path_edges, delta_len, idt, cov))
+                    # Keep the placeholder for these values for legacy purposes, but mark
+                    # them as for deletion.
+                    # The base a_ctg will also be output to the same file, for simplicity.
+                    delta_len = 0
+                    idt = 1.0
+                    cov = 1.0
+                    atig_output.append((v, w, atig_path, a_total_length, a_total_score, seq, atig_path_edges, a_ctg_id, a_edge_lines, delta_len, idt, cov))
 
                 if len(atig_output) == 1:
                     continue
 
-                sub_id = 0
-                for data in atig_output:
-                    v0, w0, tig_path, total_length, total_score, seq, atig_path_edges, delta_len, a_idt, cov = data
-                    for vv, ww in atig_path_edges:
-                        rid, s, t, aln_score, idt, e_seq = edge_data[(vv, ww)]
-                        if sub_id != 0:
-                            print("%s-%03d-%02d %s %s %s %d %d %d %0.2f" % (
-                                ctg_id, a_id, sub_id, vv, ww, rid, s, t, aln_score, idt), file=a_ctg_t_out)
-                        else:
-                            print("%s-%03d-%02d %s %s %s %d %d %d %0.2f" % (
-                                ctg_id, a_id, sub_id, vv, ww, rid, s, t, aln_score, idt), file=a_ctg_base_t_out)
+                for sub_id, data in enumerate(atig_output):
+                    v, w, tig_path, a_total_length, a_total_score, seq, atig_path_edges, a_ctg_id, a_edge_lines, delta_len, a_idt, cov = data
 
-                    if sub_id != 0:
-                        print(">%s-%03d-%02d %s %s %d %d %d %d %0.2f %0.2f" % (
-                            ctg_id, a_id, sub_id, v0, w0, total_length, total_score, len(atig_path_edges), delta_len, a_idt, cov), file=a_ctg_out)
-                        print(seq, file=a_ctg_out)
-                    else:
-                        print(">%s-%03d-%02d %s %s %d %d %d %d %0.2f %0.2f" % (
-                            ctg_id, a_id, sub_id, v0, w0, total_length, total_score, len(atig_path_edges), delta_len, a_idt, cov), file=a_ctg_base_out)
-                        print(seq, file=a_ctg_base_out)
+                    # Write out the tiling path.
+                    a_ctg_t_out.write('\n'.join(a_edge_lines))
+                    a_ctg_t_out.write('\n')
 
-                    sub_id += 1
+                    # Write the sequence.
+                    a_ctg_out.write('>%s %s %s %d %d %d %d %0.2f %0.2f\n' % (a_ctg_id, v, w, a_total_length, a_total_score, len(atig_path_edges), delta_len, idt, cov))
+                    a_ctg_out.write(''.join(seq))
+                    a_ctg_out.write('\n')
 
                 a_id += 1
 
     a_ctg_out.close()
-    a_ctg_base_out.close()
     p_ctg_out.close()
-    a_ctg_base_t_out.close()
     a_ctg_t_out.close()
     p_ctg_t_out.close()
-
 
 def main(argv=sys.argv):
     description = 'Generate the primary and alternate contig fasta files and tiling paths, given the string graph.'
@@ -397,10 +308,8 @@ We write these:
 
     p_ctg_out = open("p_ctg.fa", "w")
     a_ctg_out = open("a_ctg_all.fa", "w")
-    a_ctg_base_out = open("a_ctg_base.fa", "w")
     p_ctg_t_out = open("p_ctg_tiling_path", "w")
-    a_ctg_t_out = open("a_ctg_tiling_path", "w")
-    a_ctg_base_t_out = open("a_ctg_base_tiling_path", "w")
+    a_ctg_t_out = open("a_ctg_all_tiling_path", "w")
 """
     parser = argparse.ArgumentParser(
             description=description,
