@@ -285,7 +285,7 @@ def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
     jobs = list()
     for i, script in enumerate(scripts):
         job_id = 'tan_{:03d}'.format(i)
-        script_dir = os.path.join('tan-scripts', job_id)
+        script_dir = os.path.join('.', 'tan-scripts', job_id)
         script_fn = os.path.join(script_dir, 'run_datander.sh')
         io.mkdirs(script_dir)
         with open(script_fn, 'w') as stream:
@@ -295,7 +295,7 @@ def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
         job['input'] = dict(
                 config=config_fn,
                 db=db_fn,
-                script=os.path.abspath(script_fn),
+                script=script_fn,
         )
         job['output'] = dict(
                 job_done = 'job.done'
@@ -428,7 +428,7 @@ def rep_daligner_split(config, config_fn, db_fn, nproc, group_size, coverage_lim
     jobs = list()
     for i, script in enumerate(scripts):
         job_id = 'rep_{:04d}'.format(i)
-        script_dir = os.path.join('rep-scripts', job_id)
+        script_dir = os.path.join('.', 'rep-scripts', job_id)
         script_fn = os.path.join(script_dir, 'run_daligner.sh')
         io.mkdirs(script_dir)
         with open(script_fn, 'w') as stream:
@@ -438,7 +438,7 @@ def rep_daligner_split(config, config_fn, db_fn, nproc, group_size, coverage_lim
         job['input'] = dict(
                 config=config_fn,
                 db=db_fn,
-                script=os.path.abspath(script_fn),
+                script=script_fn,
         )
         job['output'] = dict(
                 job_done = 'job.done'
@@ -521,7 +521,7 @@ def daligner_split(config, config_fn, db_fn, nproc, wildcards, length_cutoff_fn,
     jobs = list()
     for i, script in enumerate(scripts):
         job_id = 'j_{:04d}'.format(i)
-        script_dir = os.path.join('daligner-scripts', job_id)
+        script_dir = os.path.join('.', 'daligner-scripts', job_id)
         script_fn = os.path.join(script_dir, 'run_daligner.sh')
         io.mkdirs(script_dir)
         with open(script_fn, 'w') as stream:
@@ -531,7 +531,7 @@ def daligner_split(config, config_fn, db_fn, nproc, wildcards, length_cutoff_fn,
         job['input'] = dict(
                 config=config_fn,
                 db=db_fn,
-                script=os.path.abspath(script_fn),
+                script=script_fn,
         )
         job['output'] = dict(
                 job_done = 'daligner.done'
