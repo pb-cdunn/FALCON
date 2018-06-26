@@ -605,7 +605,7 @@ def add_rep_tasks(
                     'units_of_work': '0-rawreads/%(name)s/rep-chunks/{%(name)s_id}/some-units-of-work.json'%locals(),
                 },
                 outputs={
-                    'results': '0-rawreads/%(name)s/%(name)s-runs/{%(name)s_id}/some-done-files.json'%locals(),
+                    'results': '0-rawreads/%(name)s/rep-runs/{%(name)s_id}/some-done-files.json'%locals(),
                 },
                 parameters={},
 
