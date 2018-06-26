@@ -360,6 +360,8 @@ def update_defaults(cfg):
     set_default('pa_DBsplit_option', '-x500 -s200')
     set_default('skip_checks', False)
     set_default('pa_DBdust_option', '') # Gene recommends the defaults. I have tried -w128 -t2.5 -m20
+    set_default('pa_use_median_filter', True)
+    set_default('ovlp_use_median_filter', False)
     set_default('dazcon', False)
     set_default('pa_dazcon_option', '-j 4 -x -l 500')
     set_default('ovlp_DBsplit_option', '-x500 -s200')
@@ -376,7 +378,7 @@ def update_defaults(cfg):
     set_default('target', 'assembly')
     set_default(TEXT_FILE_BUSY, bash.BUG_avoid_Text_file_busy)
 
-    for bool_key in ('skip_checks', 'dazcon', 'falcon_sense_skip_contained', 'falcon_sense_greedy', 'LA4Falcon_preload', TEXT_FILE_BUSY):
+    for bool_key in ('skip_checks', 'dazcon', 'falcon_sense_skip_contained', 'falcon_sense_greedy', 'LA4Falcon_preload', 'pa_use_median_filter', 'ovlp_use_median_filter', TEXT_FILE_BUSY):
         cfg[bool_key] = functional.cfg_tobool(cfg.get(bool_key, False))
 
     if 'dust' in cfg:
@@ -444,6 +446,8 @@ def check_unexpected_keys(cfg):
         'dazcon',
         'pa_dazcon_option',
         'pa_DBdust_option',
+        'pa_use_median_filter',
+        'ovlp_use_median_filter',
         'pa_DBsplit_option',
         'pa_HPCTANmask_option',
         'pa_HPCREPmask_option',

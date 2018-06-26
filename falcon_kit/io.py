@@ -37,7 +37,10 @@ class Percenter(object):
             counter(len(rec))
     """
     def __init__(self, name, total, log=LOG.info, units='units'):
-        log('Counting {:,d} {} from\n  "{}"'.format(total, units, name))
+        if sys.maxint == total:
+            log('Counting {} from "{}"'.format(units, name))
+        else:
+            log('Counting {:,d} {} from\n  "{}"'.format(total, units, name))
         self.total = total
         self.log = log
         self.name = name
