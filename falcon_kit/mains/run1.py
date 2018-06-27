@@ -367,7 +367,7 @@ def run(wf, config, rule_writer,
         length_cutoff_pr_fn,
         p_id2las_fn, las_fofn_fn,
         daligner_wildcard='dal1_id',
-        lamerge_wildcard='mer0_id', # mer0_id is hard-coded in dazzler, for now
+        lamerge_wildcard='mer1_id',
         daligner_params={},
         db_prefix='preads', # TODO: Infer
         daligner_split_script=pype_tasks.TASK_DB_DALIGNER_SPLIT_SCRIPT,
