@@ -21,6 +21,27 @@ import time
 
 LOG = logging.getLogger(__name__)  # default, for remote tasks
 
+def check_general_config(general_config, input_config_fn):
+    if ('pa_daligner_option' not in general_config or
+        'ovlp_daligner_option' not in general_config):
+        msg = '''Missing options.
+We now require both "pa_daligner_option" (stage 0) and "ovlp_daligner_option" (stage 1),
+which are automatically passed along to
+  HPC.daligner
+  HPC.TANmask
+  HPC.REPmask
+
+These can provide additional flags:
+  pa_HPCdaligner_option
+  pa_HPCTANmask_option
+  ovlp_HPCdaligner_option
+  pa_REPmask_code (-g/-c pairs for 3 iterations, e.g. '1,20;5,15;20,10')
+'''
+        raise Exception(msg)
+    required = ('input_fofn', 'genome_size')
+    for name in required:
+        assert name in general_config, 'Missing "{}" in {}.'.format(name, input_config_fn)
+
 def main1(prog_name, input_config_fn, logger_config_fn=None):
     global LOG
     LOG = support.setup_logger(logger_config_fn)
@@ -36,9 +57,9 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
         LOG.exception('Failed to parse config "{}".'.format(input_config_fn))
         raise
     general_config = config['General']
-    assert 'input_fofn' in general_config, 'Missing "input_fofn" in {}.'.format(input_config_fn)
+    check_general_config(general_config, input_config_fn)
     input_fofn_plf = makePypeLocalFile(general_config['input_fofn'])
-    genome_size = int(general_config.get('genome_size', '0'))
+    genome_size = int(general_config['genome_size'])
     squash = True if 0 < genome_size < 1000000 else False
     wf = PypeProcWatcherWorkflow(job_defaults=config['job.defaults'],
                                  squash=squash,
