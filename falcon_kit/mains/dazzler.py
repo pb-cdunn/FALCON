@@ -66,6 +66,7 @@ from .. import(
 LOG = logging.getLogger()
 WAIT = 20 # seconds to wait for file to exist
 
+
 def filter_DBsplit_option(opt):
     """We want -a by default, but if we see --no-a[ll], we will not add -a.
     """
@@ -450,8 +451,7 @@ def fake_rep_as_daligner_script_moved(script, dbname):
     """
     """
     We have db.Rn.block.las
-    We want db.block.las, for now.
-    TODO: What about when there are pairs yet to merge?
+    We want db.block.db.block.las, for now. (We will 'merge' this solo file later.)
     """
     re_script = re.compile(r'(mv\b.*\S+\s+)(\S+)$') # no trailing newline, for now
     mo = re_script.search(script)
@@ -476,8 +476,7 @@ def fake_rep_as_daligner_script_unmoved(script, dbname):
     """
     """
     We have db.Rn.block.las
-    We want db.block.las, for now.
-    TODO: What about when there are pairs yet to merge?
+    We want db.block.db.block.las. (We will merge later.)
     """
     re_script = re.compile(r'\s*\&\&\s*mv\s+.*$') # no trailing newline, for now
     mo = re_script.search(script)
@@ -493,16 +492,19 @@ def fake_rep_as_daligner_script_unmoved(script, dbname):
         LOG.warning(msg)
         return new_script
 
-def rep_daligner_split(config, config_fn, db_fn, nproc, wildcards, group_size, coverage_limit, uows_fn, bash_template_fn):
-    """Similar to daligner_split(), but based on HPC.REPmask instead of HPC.daligner.
-    """
-    with open(bash_template_fn, 'w') as stream:
-        stream.write(pype_tasks.TASK_DB_DALIGNER_APPLY_SCRIPT)
+def _get_rep_daligner_split_noop_scripts(db_fn):
     db = os.path.splitext(db_fn)[0]
     dbname = os.path.basename(db)
+    las_fn = '{db}.1.{db}.1.las'.format(db=dbname) # Always create just a block-1 las file.
+    script = 'python -m falcon_kit.mains.las_write_empty {}'.format(las_fn)
+    return [script]
 
+def _get_rep_daligner_split_scripts(config, db_fn, group_size, coverage_limit):
+    db = os.path.splitext(db_fn)[0]
+    dbname = os.path.basename(db)
     tracks = get_tracks(db_fn)
 
+    # First, run HPC.REPmask immediately.
     script = ''.join([
         script_HPC_REPmask(config, db, tracks,
             prefix='rep-jobs', group_size=group_size, coverage_limit=coverage_limit),
@@ -533,6 +535,19 @@ def rep_daligner_split(config, config_fn, db_fn, nproc, wildcards, group_size, c
         LAcheck = 'LAcheck -vS {} *.las'.format(db)
         script += '\n' + LAcheck + '\n'
         scripts[i] = script
+
+    return scripts
+
+def rep_daligner_split(config, config_fn, db_fn, nproc, wildcards, group_size, coverage_limit, uows_fn, bash_template_fn):
+    """Similar to daligner_split(), but based on HPC.REPmask instead of HPC.daligner.
+    """
+    with open(bash_template_fn, 'w') as stream:
+        stream.write(pype_tasks.TASK_DB_DALIGNER_APPLY_SCRIPT)
+
+    if group_size == 0:
+        scripts = _get_rep_daligner_split_noop_scripts(db_fn)
+    else:
+        scripts = _get_rep_daligner_split_scripts(config, db_fn, group_size, coverage_limit)
 
     jobs = list()
     for i, script in enumerate(scripts):
