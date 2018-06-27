@@ -5,6 +5,7 @@ import collections
 import logging
 import os
 import re
+import StringIO
 
 thisdir = os.path.dirname(os.path.abspath(__file__))
 example_HPCdaligner_fn = os.path.join(thisdir, 'HPCdaligner_synth0_new.sh')
@@ -303,7 +304,19 @@ def test_parse_REPmask_code(caplog):
 
     code = '1,300;0,300;0,300'
     assert f.parse_REPmask_code(code) == [(1,300), (0,300), (0,300)]
-    
+
+
+sample_db = """\
+files =         1
+         50 subreads.dexta m000_000
+blocks =         2
+size =      65536 cutoff =         5 all = 1
+         0         0
+        33        33
+        50        50
+"""
+def test_dazzler_get_nblocks():
+    assert 2 == f.dazzler_get_nblocks(StringIO.StringIO(sample_db))
 
 from falcon_kit.util import io
 

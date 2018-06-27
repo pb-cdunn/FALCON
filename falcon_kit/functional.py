@@ -544,3 +544,17 @@ def parse_REPmask_code(code):
         if (paira[0] > pairb[0] or pairb[0] > pairc[0]):
             raise Exception('Non-zero group sizes must increase monotonically in parsed REPmask_code: {!r} from {!r}'.format(result, code))
     return result
+
+
+def dazzler_get_nblocks(db_stream):
+    """Return #blocks in dazzler-db.
+    """
+    nblock = 1
+    new_db = True
+    for l in db_stream:
+        l = l.strip().split()
+        if l[0] == "blocks" and l[1] == "=":
+            nblock = int(l[2])
+            new_db = False
+            break
+    return nblock

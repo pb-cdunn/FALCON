@@ -492,11 +492,23 @@ def fake_rep_as_daligner_script_unmoved(script, dbname):
         LOG.warning(msg)
         return new_script
 
+
 def _get_rep_daligner_split_noop_scripts(db_fn):
+    """
+    We need code to generate an empty .las file for each block.
+    We do all in the same script to reduce the number of qsub calls for each iteration.
+    (We cannot generate only 1 block because Catrack expects all N.)
+    """
+    with open(db_fn) as stream:
+        nblocks = functional.dazzler_get_nblocks(stream)
+    LOG.debug('Found {} blocks in DB {!r}'.format(nblocks, db_fn))
     db = os.path.splitext(db_fn)[0]
     dbname = os.path.basename(db)
-    las_fn = '{db}.1.{db}.1.las'.format(db=dbname) # Always create just a block-1 las file.
-    script = 'python -m falcon_kit.mains.las_write_empty {}'.format(las_fn)
+    lines = []
+    for i in range(1, nblocks+1):
+        las_fn = '{db}.{i}.{db}.{i}.las'.format(db=dbname, i=i)
+        lines.append('python -m falcon_kit.mains.las_write_empty {}'.format(las_fn))
+    script = '\n'.join(lines)
     return [script]
 
 def _get_rep_daligner_split_scripts(config, db_fn, group_size, coverage_limit):

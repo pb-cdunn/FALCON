@@ -543,23 +543,6 @@ def setup_logger(logging_config_fn):
     return logger
 
 
-def get_nblock(db_file):
-    """Return #blocks in dazzler-db.
-    """
-    nblock = 1
-    new_db = True
-    if os.path.exists(db_file):
-        with open(db_file) as f:
-            for l in f:
-                l = l.strip().split()
-                if l[0] == "blocks" and l[1] == "=":
-                    nblock = int(l[2])
-                    new_db = False
-                    break
-    # Ignore new_db for now.
-    return nblock
-
-
 def daligner_gather_las(job_rundirs):
     """Return list of (block, las_fn).
     """
