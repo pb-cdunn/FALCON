@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from ..pype import (wrap_gen_task as gen_task, gen_parallel_tasks, Dist)
-from .. import run_support as support
+from .. import run_support
 from .. import bash, pype_tasks, snakemake
 from ..util.system import (only_these_symlinks, lfs_setstripe_maybe)
 from .. import io
@@ -44,12 +44,12 @@ These can provide additional flags:
 
 def main1(prog_name, input_config_fn, logger_config_fn=None):
     global LOG
-    LOG = support.setup_logger(logger_config_fn)
+    LOG = run_support.setup_logger(logger_config_fn)
     lfs_setstripe_maybe(path='.', stripe=12)
 
     LOG.info('fc_run started with configuration %s', input_config_fn)
     try:
-        config = support.parse_cfg_file(input_config_fn)
+        config = run_support.parse_cfg_file(input_config_fn)
         import json
         dumped = json.dumps(config, indent=2, separators=(',', ': '), sort_keys=True)
         LOG.info('cfg=\n{}'.format(dumped))
@@ -84,7 +84,7 @@ def run(wf, config, rule_writer,
     """
     Preconditions (for now):
     * LOG
-    * run_support.logger
+    * run_run_support.logger
     """
     parsed_config = io.deserialize(config_fn)
     if parsed_config != config:
@@ -98,7 +98,7 @@ def run(wf, config, rule_writer,
     falcon_asm_dir = '2-asm-falcon'
 
     for d in (rawread_dir, pread_dir, falcon_asm_dir):
-        support.make_dirs(d)
+        run_support.make_dirs(d)
 
     # only matter for parallel jobs
     job_defaults = config['job.defaults']
