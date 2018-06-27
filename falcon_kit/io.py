@@ -61,9 +61,13 @@ class Percenter(object):
             self.count, self.units, self.call, self.name))
 
 
-class FilePercenter(Percenter):
-    def __init__(self, fn, log=LOG.info):
-        Percenter.__init__(self, fn, filesize(fn), log, units='bytes')
+def FilePercenter(fn, log=LOG.info):
+    if fn in ('-', ''):
+        def noop(more, label=None):
+            pass
+        return noop
+    else:
+        return Percenter(fn, filesize(fn), log, units='bytes')
 
 @contextlib.contextmanager
 def open_progress(fn, mode='r', log=LOG.info):

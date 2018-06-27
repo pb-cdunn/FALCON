@@ -212,6 +212,8 @@ def open_fasta_reader(fn, log=LOG.info):
         ofs = gzip.open(filename, mode)
     elif filename.endswith(".dexta"):
         ofs = stream_stdout("undexta -vkU -w60 -i", filename)
+    elif '-' == filename:
+        ofs = sys.stdin
     else:
         ofs = open(filename, mode)
     yield yield_fasta_records(ofs, filename, log=log)
