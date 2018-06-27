@@ -54,20 +54,24 @@ class Percenter(object):
             self.a = max(self.a, more)
             self.a = min(self.a, (self.total-self.count), round(self.total/10.0))
             self.next_count = self.count + self.a
-            self.log('{:>10} count={:15,d} {:6.02f}% {}'.format(
-                '#{:,d}'.format(self.call), self.count, 100.0*self.count/self.total, label))
+            if self.total == sys.maxint:
+                msg = '{:>10} count={:15,d} {}'.format(
+                    '#{:,d}'.format(self.call), self.count, label)
+            else:
+                msg = '{:>10} count={:15,d} {:6.02f}% {}'.format(
+                    '#{:,d}'.format(self.call), self.count, 100.0*self.count/self.total, label)
+            self.log(msg)
     def finish(self):
         self.log('Counted {:,d} {} in {} calls from:\n  "{}"'.format(
             self.count, self.units, self.call, self.name))
 
 
 def FilePercenter(fn, log=LOG.info):
-    if fn in ('-', ''):
-        def noop(more, label=None):
-            pass
-        return noop
+    if '-' == fn or not fn:
+        size = sys.maxint
     else:
-        return Percenter(fn, filesize(fn), log, units='bytes')
+        size = filesize(fn)
+    return Percenter(fn, size, log, units='bytes')
 
 @contextlib.contextmanager
 def open_progress(fn, mode='r', log=LOG.info):
