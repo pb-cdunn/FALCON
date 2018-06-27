@@ -13,6 +13,7 @@ import logging
 import md5
 import re
 import subprocess
+import sys
 
 LOG = logging.getLogger(__name__)
 
@@ -212,6 +213,9 @@ def open_fasta_reader(fn, log=LOG.info):
         ofs = gzip.open(filename, mode)
     elif filename.endswith(".dexta"):
         ofs = stream_stdout("undexta -vkU -w60 -i", filename)
+    elif '-' == fn:
+        ofs = sys.stdin
+        filename = fn
     else:
         ofs = open(filename, mode)
     yield yield_fasta_records(ofs, filename, log=log)
