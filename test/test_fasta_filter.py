@@ -16,6 +16,8 @@ def test_help():
 #############################
 fasta_tests = {}
 expected_tests = {}
+expected_general_median_tests = {}
+expected_internal_median_tests = {}
 
 fasta_tests[1] = ''
 expected_tests[1] = ''
@@ -52,41 +54,41 @@ GATTACAGATTACAGATTACA
 """
 
 fasta_tests[4] = """\
->synthetic/2/0_500
+>synthetic/2/0_1
 A
->synthetic/3/0_500
+>synthetic/3/0_1
 A
->synthetic/1/0_500
+>synthetic/1/0_5
 ACGTA
->synthetic/1/0_500
+>synthetic/1/5_7
 AC
->synthetic/1/0_500
+>synthetic/1/7_10
 ACG
->synthetic/1/0_500
+>synthetic/1/10_14
 ACGT
->synthetic/1/0_500
+>synthetic/1/14_15
 A
->synthetic/4/0_500
+>synthetic/4/0_1
 A
->synthetic/5/0_500
+>synthetic/5/0_2
 AC
->synthetic/5/0_500
+>synthetic/5/2_5
 ACG
->synthetic/5/0_500
+>synthetic/5/5_9
 ACGT
->synthetic/5/0_500
+>synthetic/5/9_14
 ACGTA
 """
 expected_tests[4] = """\
->synthetic/2/0_500
+>synthetic/2/0_1
 A
->synthetic/3/0_500
+>synthetic/3/0_1
 A
->synthetic/1/0_500
+>synthetic/1/7_10
 ACG
->synthetic/4/0_500
+>synthetic/4/0_1
 A
->synthetic/5/0_500
+>synthetic/5/5_9
 ACGT
 """
 
@@ -105,42 +107,82 @@ A
 expected_tests[5] = None    # The module under test should throw on the above input
 
 fasta_tests[6] = """\
->synthetic/5/0_500
+>synthetic/5/2_5
 ACG
->synthetic/2/0_500
+>synthetic/2/0_1
 A
->synthetic/3/0_500
+>synthetic/3/0_1
 A
->synthetic/1/0_500
+>synthetic/1/0_5
 ACGTA
->synthetic/1/0_500
+>synthetic/1/10_14
 ACGT
->synthetic/1/0_500
+>synthetic/1/14_15
 A
->synthetic/4/0_500
+>synthetic/4/0_1
 A
->synthetic/5/0_500
+>synthetic/5/0_2
 AC
->synthetic/5/0_500
+>synthetic/5/5_9
 ACGT
->synthetic/5/0_500
+>synthetic/5/9_14
 ACGTA
->synthetic/1/0_500
+>synthetic/1/5_7
 AC
->synthetic/1/0_500
+>synthetic/1/7_10
 ACG
 """
 expected_tests[6] = """\
->synthetic/2/0_500
+>synthetic/2/0_1
 A
->synthetic/3/0_500
+>synthetic/3/0_1
 A
->synthetic/4/0_500
+>synthetic/4/0_1
 A
->synthetic/5/0_500
+>synthetic/5/5_9
 ACGT
->synthetic/1/0_500
+>synthetic/1/7_10
 ACG
+"""
+
+# Specific for the internal-median command.
+fasta_tests[7] = """\
+>synthetic/1/0_3
+AAA
+>synthetic/1/3_7
+ACAC
+>synthetic/1/7_10
+AAA
+>synthetic/2/0_3
+TTT
+>synthetic/2/3_8
+TTTGG
+>synthetic/3/0_5
+TTTGG
+>synthetic/3/5_8
+TTT
+>synthetic/4/0_5
+CCCCC
+"""
+expected_general_median_tests[7] = """\
+>synthetic/1/7_10
+AAA
+>synthetic/2/3_8
+TTTGG
+>synthetic/3/0_5
+TTTGG
+>synthetic/4/0_5
+CCCCC
+"""
+expected_internal_median_tests[7] = """\
+>synthetic/1/3_7
+ACAC
+>synthetic/2/3_8
+TTTGG
+>synthetic/3/0_5
+TTTGG
+>synthetic/4/0_5
+CCCCC
 """
 
 #########################
@@ -259,6 +301,65 @@ def test_run_median_filter_7(tmpdir):
     """
     check_run_raises(mod.run_median_filter, fasta_tests[5], '-')
 
+def test_run_median_filter_7(tmpdir):
+    in_fa_file = tmpdir.join('in.fa')
+    fasta = fasta_tests[6]
+    in_fa_file.write(fasta)
+    check_run(mod.run_median_filter, fasta_tests[7], expected_general_median_tests[7], str(in_fa_file))
+
+########################################
+### Test the internal median filter. ###
+########################################
+def test_run_internal_median_filter_1(tmpdir):
+    in_fa_file = tmpdir.join('in.fa')
+    fasta = fasta_tests[1]
+    in_fa_file.write(fasta)
+    check_run(mod.run_internal_median_filter, fasta, expected_tests[1], str(in_fa_file))
+
+def test_run_minternal_edian_filter_2(tmpdir):
+    in_fa_file = tmpdir.join('in.fa')
+    fasta = fasta_tests[2]
+    in_fa_file.write(fasta)
+    check_run(mod.run_internal_median_filter, fasta, expected_tests[2], str(in_fa_file))
+
+def test_run_internal_median_filter_3(tmpdir):
+    in_fa_file = tmpdir.join('in.fa')
+    fasta = fasta_tests[3]
+    in_fa_file.write(fasta)
+    check_run(mod.run_internal_median_filter, fasta, expected_tests[3], str(in_fa_file))
+
+def test_run_internal_median_filter_4(tmpdir):
+    in_fa_file = tmpdir.join('in.fa')
+    fasta = fasta_tests[4]
+    in_fa_file.write(fasta)
+    check_run(mod.run_internal_median_filter, fasta, expected_tests[4], str(in_fa_file))
+
+def test_run_internal_median_filter_5(tmpdir):
+    in_fa_file = tmpdir.join('in.fa')
+    fasta = fasta_tests[5]
+    in_fa_file.write(fasta)
+    check_run_raises(mod.run_internal_median_filter, fasta_tests[5], str(in_fa_file))
+
+def test_run_internal_median_filter_6(tmpdir):
+    in_fa_file = tmpdir.join('in.fa')
+    fasta = fasta_tests[6]
+    in_fa_file.write(fasta)
+    check_run(mod.run_internal_median_filter, fasta_tests[6], expected_tests[6], str(in_fa_file))
+
+def test_run_internal_median_filter_7(tmpdir):
+    """
+    The run_median_filter asserts if the input file doesn't exist.
+    This is to prevent specifying streams we can't rewind.
+    """
+    check_run_raises(mod.run_internal_median_filter, fasta_tests[5], '-')
+
+def test_run_internal_median_filter_8(tmpdir):
+    in_fa_file = tmpdir.join('in.fa')
+    fasta = fasta_tests[6]
+    in_fa_file.write(fasta)
+    check_run(mod.run_internal_median_filter, fasta_tests[7], expected_internal_median_tests[7], str(in_fa_file))
+
+
 ###############################
 ### Test the main commands. ###
 ###############################
@@ -279,3 +380,7 @@ def test_main_cmd_streamed_median_2(tmpdir, capsys):
 def test_main_cmd_median_1(tmpdir, capsys):
     in_fa_file = tmpdir.join('in.fa')
     check_main_from_file('median', fasta_tests[4], expected_tests[4], in_fa_file, capsys)
+
+def test_main_cmd_internal_median_1(tmpdir, capsys):
+    in_fa_file = tmpdir.join('in.fa')
+    check_main_from_file('internal-median', fasta_tests[4], expected_tests[4], in_fa_file, capsys)
