@@ -867,7 +867,7 @@ def merge_combine(gathered_fn, las_paths_fn, block2las_fn):
     for las_fn in sorted(las_fns):
         if not os.path.exists(las_fn):
             msg = 'Did not find las-file {!r}. Waiting {} seconds.'.format(las_fn, WAIT)
-            LOG.info(las_fn)
+            LOG.info(msg)
             time.sleep(WAIT)
             if not os.path.exists(las_fn):
                 msg = 'Did not find las-file {!r}, even after waiting {} seconds. Maybe retry later?'.format(las_fn, WAIT)
@@ -1154,7 +1154,7 @@ def add_merge_split_arguments(parser):
         help='input. foo.a.foo.b.las files from daligner.',
     )
     parser.add_argument(
-        '--split-fn', default='merge-mask-uows.json',
+        '--split-fn', default='merge-uows.json',
         help='output. Units-of-work for LAmerge.',
     )
     parser.add_argument(
