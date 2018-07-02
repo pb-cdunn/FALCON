@@ -15,13 +15,18 @@ from .. import(
 )
 
 LOG = logging.getLogger()
+WAIT = 20 # seconds
 
 
-def bam2dexta_split(config_fn, bam_fofn_fn, wildcards, split_fn, bash_template_fn):
+def bam2dexta_split(config_fn, bam_subreadset_fn, wildcards, split_fn, bash_template_fn):
+    assert bam_subreadset_fn.endswith('.xml')
     with open(bash_template_fn, 'w') as stream:
         stream.write(pype_tasks.TASK_BAM2DEXTA_APPLY_SCRIPT)
 
-    bam_paths = io.deserialize(bam_fofn_fn)
+    split_dataset_prefix = os.path.join(os.getcwd(), 'split') # TODO: Test this as relative sub-dir.
+
+    from ..util import dataset_split # introduces pbcore dependency
+    bam_paths = dataset_split.split_dataset(bam_subreadset_fn, split_dataset_prefix)
 
     jobs = list()
     for i, bam_fn in enumerate(bam_paths):
@@ -58,7 +63,7 @@ def bam2dexta_apply(bam_fn, dexta_fn):
             **locals())
     io.syscall(cmd)
 
-def bam2dexta_combine(gathered_fn, dexta_paths_fn):
+def bam2dexta_combine(gathered_fn, dexta_fofn_fn):
     gathered = io.deserialize(gathered_fn)
     d = os.path.abspath(os.path.realpath(os.path.dirname(gathered_fn)))
     def abspath(fn):
@@ -77,13 +82,16 @@ def bam2dexta_combine(gathered_fn, dexta_paths_fn):
             msg = 'Did not find {!r}. Waiting {} seconds.'.format(dexta_fn, WAIT)
             LOG.info(msg)
             time.sleep(WAIT)
-            if not os.path.exists(las_fn):
-                msg = 'Did not find {!r}, even after waiting {} seconds. Maybe retry later?'.format(bam_fn, WAIT)
+            if not os.path.exists(dexta_fn):
+                msg = 'Did not find {!r}, even after waiting {} seconds. Maybe retry later?'.format(dexta_fn, WAIT)
                 raise Exception(msg)
-        dexta_paths.append(las_fn)
+        dexta_paths.append(dexta_fn)
 
     # Serialize result.
-    io.serialize(dexta_paths_fn, sorted(dexta_paths))
+    #io.serialize(dexta_paths_fn, sorted(dexta_paths))
+    with open(dexta_fofn_fn, 'w') as stream:
+        stream.write('\n'.join(dexta_paths))
+        stream.write('\n')
 
 
 def setup_logging(log_level):
@@ -96,14 +104,14 @@ def setup_logging(log_level):
 
 def cmd_split(args):
     bam2dexta_split(
-            args.config_fn, args.bam_fofn_fn,
+            args.config_fn, args.bam_subreadset_fn,
             args.wildcards,
             args.split_fn, args.bash_template_fn,
     )
 def cmd_apply(args):
     bam2dexta_apply(args.bam_fn, args.dexta_fn)
 def cmd_combine(args):
-    bam2dexta_combine(args.gathered_fn, args.dexta_paths_fn)
+    bam2dexta_combine(args.gathered_fn, args.dexta_fofn_fn)
 
 def get_ours(config_fn, db_fn):
     ours = dict()
@@ -118,8 +126,8 @@ def add_split_arguments(parser):
         help='Comma-separated string of keys to be subtituted into output paths for each job, if any. (Helps with snakemake and pypeflow; not needed in pbsmrtpipe, since outputs are pre-determined.)',
     )
     parser.add_argument(
-        '--bam-fofn-fn',
-        help='input. These could be .bam or subread datasets.'
+        '--bam-subreadset-fn',
+        help='input. Dataset (.xml) of bam files of subreads.'
     )
     parser.add_argument(
         '--split-fn', default='bam2dexta-uows.json',
@@ -143,8 +151,8 @@ def add_combine_arguments(parser):
         help='input. List of sentinels. Produced by gen_parallel_tasks() gathering. The .las files are next to these.',
     )
     parser.add_argument(
-        '--dexta-paths-fn', required=True,
-        help='output. JSON list of dexta paths.')
+        '--dexta-fofn-fn', required=True,
+        help='output. FOFN of dexta paths.')
 
 class HelpF(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
