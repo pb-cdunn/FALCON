@@ -115,6 +115,62 @@ def run(wf, config, rule_writer,
     if general_config['input_type'] == 'raw':
         # Most common workflow: Start with rawreads.
 
+        # run bam2dexta
+        bam2dexta_uows_fn = os.path.join(
+            rawread_dir, 'bam2dexta-split', 'bam2dexta-uows.json')
+        bam2dexta_bash_template_fn = os.path.join(
+            rawread_dir, 'bam2dexta-split', 'bash_template.sh')
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_BAM2DEXTA_SPLIT_SCRIPT,
+            inputs={
+                'config': general_config_fn,
+                'bam': '/pbi/dept/secondary/testdata/git_sym_cache/synth5k.2016-11-02/synth5k.xml',
+            },
+            outputs={
+                'split': bam2dexta_uows_fn,
+                'bash_template': bam2dexta_bash_template_fn,
+            },
+            parameters={
+                'wildcards': 'bam2dexta_id',
+            },
+            rule_writer=rule_writer,
+            dist=Dist(local=True),
+        ))
+
+        gathered_fn = os.path.join(rawread_dir, 'bam2dexta-gathered', 'gathered-dexta-files.json')
+        gen_parallel_tasks(
+            wf, rule_writer,
+            bam2dexta_uows_fn, gathered_fn,
+            run_dict=dict(
+                bash_template_fn=bam2dexta_bash_template_fn,
+                script='fubar-TODO', #pype_tasks.TASK_DB_TAN_APPLY_SCRIPT, # for snakemake stuff
+                inputs={
+                    'units_of_work': '0-rawreads/bam2dexta-chunks/{bam2dexta_id}/some-units-of-work.json',
+                },
+                outputs={
+                    'results': '0-rawreads/bam2dexta-runs/{bam2dexta_id}/some-done-files.json',
+                },
+                parameters={},
+
+            ),
+            dist=Dist(NPROC=1, MB=4000, job_dict=config['job.step.da']),
+        )
+
+        input_fofn_fn = os.path.join(rawread_dir, 'bam2dexta-combine', 'input.fofn')
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_BAM2DEXTA_COMBINE_SCRIPT,
+            inputs={
+                'config': general_config_fn,
+                'gathered': gathered_fn,
+            },
+            outputs={
+                'fofn': input_fofn_fn,
+            },
+            parameters={},
+            rule_writer=rule_writer,
+            dist=Dist(local=True),
+        ))
+
         # import sequences into daligner DB
         # calculate length_cutoff (if specified as -1)
         # split DB
@@ -125,7 +181,8 @@ def run(wf, config, rule_writer,
             script=pype_tasks.TASK_DB_BUILD_SCRIPT,
             inputs={
                 'config': general_config_fn,
-                'input_fofn': fn(input_fofn_plf),
+                'input_fofn': input_fofn_fn,
+                'bam_gathered': gathered_fn,
             },
             outputs={
                 'length_cutoff': length_cutoff_fn,

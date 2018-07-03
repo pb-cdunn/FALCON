@@ -80,15 +80,20 @@ def script_build_db(config, input_fofn_fn, db):
     'dust' track will also be generated.
     """
     params = dict(config)
+    try:
+        cat_fasta = functional.choose_cat_fasta(open(input_fofn_fn).read())
+    except Exception:
+        LOG.exception('Using "cat" by default.')
+        cat_fasta = 'cat '
     DBdust = 'DBdust {} {}'.format(config.get('pa_DBdust_option', ''), db)
-    fasta_filter_cmd = 'median' if config.get('median_filter_opt', False) else 'pass'
+    fasta_filter_cmd = 'streamed-median' if config.get('median_filter_opt', False) else 'pass'
     params.update(locals())
     script = """\
 echo "PBFALCON_ERRFILE=$PBFALCON_ERRFILE"
 set -o pipefail
 rm -f {db}.db .{db}.* # in case of re-run
 #fc_fasta2fasta < {input_fofn_fn} >| fc.fofn
-while read fn; do  python -m falcon_kit.mains.fasta_filter {fasta_filter_cmd} $fn | fasta2DB -v {db} -i${{fn##*/}}; done < {input_fofn_fn}
+while read fn; do  {cat_fasta} ${{fn}} | python -m falcon_kit.mains.fasta_filter {fasta_filter_cmd} - | fasta2DB -v {db} -i${{fn##*/}}; done < {input_fofn_fn}
 #cat fc.fofn | xargs rm -f
 {DBdust}
 """.format(**params)
@@ -867,7 +872,7 @@ def merge_combine(gathered_fn, las_paths_fn, block2las_fn):
     for las_fn in sorted(las_fns):
         if not os.path.exists(las_fn):
             msg = 'Did not find las-file {!r}. Waiting {} seconds.'.format(las_fn, WAIT)
-            LOG.info(las_fn)
+            LOG.info(msg)
             time.sleep(WAIT)
             if not os.path.exists(las_fn):
                 msg = 'Did not find las-file {!r}, even after waiting {} seconds. Maybe retry later?'.format(las_fn, WAIT)
@@ -1154,7 +1159,7 @@ def add_merge_split_arguments(parser):
         help='input. foo.a.foo.b.las files from daligner.',
     )
     parser.add_argument(
-        '--split-fn', default='merge-mask-uows.json',
+        '--split-fn', default='merge-uows.json',
         help='output. Units-of-work for LAmerge.',
     )
     parser.add_argument(
