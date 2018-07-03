@@ -19,7 +19,7 @@ LOG = logging.getLogger()
 WAIT = 20 # seconds
 
 
-def bam2dexta_split(config_fn, bam_subreadset_fn, wildcards, split_fn, bash_template_fn):
+def bam2dexta_split(bam_subreadset_fn, wildcards, split_fn, bash_template_fn):
     assert bam_subreadset_fn.endswith('.xml')
     with open(bash_template_fn, 'w') as stream:
         stream.write(pype_tasks.TASK_BAM2DEXTA_APPLY_SCRIPT)
@@ -43,7 +43,6 @@ def bam2dexta_split(config_fn, bam_subreadset_fn, wildcards, split_fn, bash_temp
         dexta_fn = 'subreads.{}.dexta'.format(job_id)
         job = dict()
         job['input'] = dict(
-                config=config_fn,
                 bam=bam_fn,
         )
         job['output'] = dict(
@@ -107,7 +106,7 @@ def setup_logging(log_level):
 
 def cmd_split(args):
     bam2dexta_split(
-            args.config_fn, args.bam_subreadset_fn,
+            args.bam_subreadset_fn,
             args.wildcards,
             args.split_fn, args.bash_template_fn,
     )
@@ -116,12 +115,12 @@ def cmd_apply(args):
 def cmd_combine(args):
     bam2dexta_combine(args.gathered_fn, args.dexta_fofn_fn)
 
-def get_ours(config_fn, db_fn):
-    ours = dict()
-    config = io.deserialize(config_fn)
-    LOG.info('config({!r}):\n{}'.format(config_fn, config))
-    LOG.info('our subset of config:\n{}'.format(ours))
-    return ours
+#def get_ours(config_fn):
+#    ours = dict()
+#    config = io.deserialize(config_fn)
+#    LOG.info('config({!r}):\n{}'.format(config_fn, config))
+#    LOG.info('our subset of config:\n{}'.format(ours))
+#    return ours
 
 def add_split_arguments(parser):
     parser.add_argument(
@@ -175,10 +174,6 @@ def parse_args(argv):
     parser.add_argument(
         '--nproc', type=int, default=0,
         help='ignored for now, but non-zero will mean "No more than this."',
-    )
-    parser.add_argument(
-        '--config-fn', required=True,
-        help='Input. JSON of user-configuration. (This is probably the [General] section.)',
     )
 
     help_split = 'get each bam-file (or subread dataset file)'

@@ -123,7 +123,6 @@ def run(wf, config, rule_writer,
         wf.addTask(gen_task(
             script=pype_tasks.TASK_BAM2DEXTA_SPLIT_SCRIPT,
             inputs={
-                'config': general_config_fn,
                 'bam': '/pbi/dept/secondary/testdata/git_sym_cache/synth5k.2016-11-02/synth5k.xml',
             },
             outputs={
@@ -160,7 +159,6 @@ def run(wf, config, rule_writer,
         wf.addTask(gen_task(
             script=pype_tasks.TASK_BAM2DEXTA_COMBINE_SCRIPT,
             inputs={
-                'config': general_config_fn,
                 'gathered': gathered_fn,
             },
             outputs={
