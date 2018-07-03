@@ -80,15 +80,20 @@ def script_build_db(config, input_fofn_fn, db):
     'dust' track will also be generated.
     """
     params = dict(config)
+    try:
+        cat_fasta = functional.choose_cat_fasta(open(input_fofn_fn).read())
+    except Exception:
+        LOG.exception('Using "cat" by default.')
+        cat_fasta = 'cat '
     DBdust = 'DBdust {} {}'.format(config.get('pa_DBdust_option', ''), db)
-    fasta_filter_cmd = 'median' if config.get('median_filter_opt', False) else 'pass'
+    fasta_filter_cmd = 'streamed-median' if config.get('median_filter_opt', False) else 'pass'
     params.update(locals())
     script = """\
 echo "PBFALCON_ERRFILE=$PBFALCON_ERRFILE"
 set -o pipefail
 rm -f {db}.db .{db}.* # in case of re-run
 #fc_fasta2fasta < {input_fofn_fn} >| fc.fofn
-while read fn; do  python -m falcon_kit.mains.fasta_filter {fasta_filter_cmd} $fn | fasta2DB -v {db} -i${{fn##*/}}; done < {input_fofn_fn}
+while read fn; do  {cat_fasta} ${{fn}} | python -m falcon_kit.mains.fasta_filter {fasta_filter_cmd} - | fasta2DB -v {db} -i${{fn##*/}}; done < {input_fofn_fn}
 #cat fc.fofn | xargs rm -f
 {DBdust}
 """.format(**params)
