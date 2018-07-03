@@ -5,11 +5,14 @@ from __future__ import absolute_import
 
 #from builtins import str
 from builtins import object
+import contextlib
 import os
 import resource
 import shlex
+import shutil
 import subprocess as sp
 import sys
+import tempfile
 import traceback
 from ..io import deserialize
 
@@ -251,3 +254,13 @@ def yield_validated_fns(fofn):
     except Exception:
         sys.stderr.write('Failed to validate FOFN {!r}\n'.format(fofn))
         raise
+
+
+@contextlib.contextmanager
+def TemporaryDirectory():
+    name = tempfile.mkdtemp()
+    LOG('TemporaryDirectory={!r}'.format(name))
+    try:
+        yield name
+    finally:
+        shutil.rmtree(name)

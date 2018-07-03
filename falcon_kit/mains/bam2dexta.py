@@ -8,7 +8,7 @@ import os
 import re
 import sys
 import time
-from ..util.io import yield_validated_fns
+from ..util.io import (yield_validated_fns, TemporaryDirectory)
 from .. import io, functional
 from .. import(
         bash,  # for write_sub_script
@@ -54,16 +54,17 @@ def bam2dexta_split(bam_subreadset_fn, wildcards, split_fn, bash_template_fn):
         jobs.append(job)
     io.serialize(split_fn, jobs)
 
+
 def bam2dexta_apply(bam_fn, dexta_fn):
     """Given a bam subread DataSet, write a .dexta file.
     """
-    io.rm_force(dexta_fn)
-    # This command is not quite right yet. TODO
-    cmd = 'rm -f {dexta_fn}; bam2fasta -u -o foo {bam_fn}; dexta foo.fasta; time mv -f foo.dexta {dexta_fn}'.format(
+    #io.rm_force(dexta_fn)
+    with TemporaryDirectory() as tmpdir:
+        cmd = 'rm -f {dexta_fn}; ls -larth {tmpdir}; (bam2fasta -u -o - {bam_fn} | dexta -i >| {tmpdir}/foo.dexta); time mv -f {tmpdir}/foo.dexta {dexta_fn}'.format(
             **locals())
-    # Note: If 'dexta' fails, the script will error. So we might still have an empty foo.dexta, but
-    # we will not have moved it to {dexta_fn}.
-    io.syscall(cmd)
+        # Note: If 'dexta' fails, the script will error. So we might still have an empty foo.dexta, but
+        # we will not have moved it to {dexta_fn}.
+        io.syscall(cmd)
 
 def bam2dexta_combine(gathered_fn, dexta_fofn_fn):
     gathered = io.deserialize(gathered_fn)
