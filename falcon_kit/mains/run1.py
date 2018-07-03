@@ -8,7 +8,7 @@ from .. import io
 from .. import functional
 # pylint: disable=no-name-in-module, import-error, fixme, line-too-long
 from pypeflow.simple_pwatcher_bridge import (PypeProcWatcherWorkflow, MyFakePypeThreadTaskBase,
-                                             makePypeLocalFile, fn, PypeTask)
+                                             makePypeLocalFile, PypeTask)
 import argparse
 import glob
 import json
@@ -58,7 +58,7 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
         raise
     general_config = config['General']
     check_general_config(general_config, input_config_fn)
-    input_fofn_plf = makePypeLocalFile(general_config['input_fofn'])
+    input_fofn_fn = general_config['input_fofn']
     genome_size = int(general_config['genome_size'])
     squash = True if 0 < genome_size < 1000000 else False
     wf = PypeProcWatcherWorkflow(job_defaults=config['job.defaults'],
@@ -73,48 +73,14 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
         rule_writer = snakemake.SnakemakeRuleWriter(snakemake_writer)
         run(wf, config, rule_writer,
             os.path.abspath(config_fn),
-            input_fofn_plf=input_fofn_plf,
+            input_fofn_fn=input_fofn_fn,
             )
 
 
-def run(wf, config, rule_writer,
-        config_fn,
-        input_fofn_plf,
-        ):
-    """
-    Preconditions (for now):
-    * LOG
-    * run_run_support.logger
-    """
-    parsed_config = io.deserialize(config_fn)
-    if parsed_config != config:
-        msg = 'Config from {!r} != passed config'.format(config_fn)
-        raise Exception(msg)
-    general_config = config['General']
-    general_config_fn = os.path.join(os.path.dirname(config_fn), 'General_config.json')
-    io.serialize(general_config_fn, general_config) # Some tasks use this.
-    rawread_dir = '0-rawreads'
-    pread_dir = '1-preads_ovl'
-    falcon_asm_dir = '2-asm-falcon'
-
-    for d in (rawread_dir, pread_dir, falcon_asm_dir):
-        run_support.make_dirs(d)
-
-    # only matter for parallel jobs
-    job_defaults = config['job.defaults']
-    #exitOnFailure = bool(job_defaults.get('stop_all_jobs_on_failure', False))
-    global default_njobs
-    default_njobs = int(job_defaults.get('njobs', 7))
-    wf.max_jobs = default_njobs
-
-    assert general_config['input_type'] in (
-        'raw', 'preads'), 'Invalid input_type=={!r}'.format(general_config['input_type'])
-
-    parameters = {}
-
-    if general_config['input_type'] == 'raw':
-        # Most common workflow: Start with rawreads.
-
+def add_bam2dexta_tasks(
+            wf, rule_writer,
+            config,
+            input_fofn_fn, rawread_dir):
         # run bam2dexta
         bam2dexta_uows_fn = os.path.join(
             rawread_dir, 'bam2dexta-split', 'bam2dexta-uows.json')
@@ -123,7 +89,7 @@ def run(wf, config, rule_writer,
         wf.addTask(gen_task(
             script=pype_tasks.TASK_BAM2DEXTA_SPLIT_SCRIPT,
             inputs={
-                'bam': '/pbi/dept/secondary/testdata/git_sym_cache/synth5k.2016-11-02/synth5k.xml',
+                'bam': input_fofn_fn,
             },
             outputs={
                 'split': bam2dexta_uows_fn,
@@ -169,6 +135,50 @@ def run(wf, config, rule_writer,
             dist=Dist(local=True),
         ))
 
+        return input_fofn_fn
+
+
+def run(wf, config, rule_writer,
+        config_fn,
+        input_fofn_fn,
+        ):
+    """
+    Preconditions (for now):
+    * LOG
+    * run_run_support.logger
+    """
+    parsed_config = io.deserialize(config_fn)
+    if parsed_config != config:
+        msg = 'Config from {!r} != passed config'.format(config_fn)
+        raise Exception(msg)
+    general_config = config['General']
+    general_config_fn = os.path.join(os.path.dirname(config_fn), 'General_config.json')
+    io.serialize(general_config_fn, general_config) # Some tasks use this.
+    rawread_dir = '0-rawreads'
+    pread_dir = '1-preads_ovl'
+    falcon_asm_dir = '2-asm-falcon'
+
+    for d in (rawread_dir, pread_dir, falcon_asm_dir):
+        run_support.make_dirs(d)
+
+    # only matter for parallel jobs
+    job_defaults = config['job.defaults']
+    #exitOnFailure = bool(job_defaults.get('stop_all_jobs_on_failure', False))
+    global default_njobs
+    default_njobs = int(job_defaults.get('njobs', 7))
+    wf.max_jobs = default_njobs
+
+    assert general_config['input_type'] in (
+        'raw', 'preads'), 'Invalid input_type=={!r}'.format(general_config['input_type'])
+
+    parameters = {}
+
+    if general_config['input_type'] == 'raw':
+        # Most common workflow: Start with rawreads.
+
+        if input_fofn_fn.endswith('.xml'):
+            input_fofn_fn = add_bam2dexta_tasks(wf, rule_writer, config, input_fofn_fn, rawread_dir)
+
         # import sequences into daligner DB
         # calculate length_cutoff (if specified as -1)
         # split DB
@@ -180,7 +190,6 @@ def run(wf, config, rule_writer,
             inputs={
                 'config': general_config_fn,
                 'input_fofn': input_fofn_fn,
-                'bam_gathered': gathered_fn,
             },
             outputs={
                 'length_cutoff': length_cutoff_fn,
