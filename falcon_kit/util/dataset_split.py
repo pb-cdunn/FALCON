@@ -1,6 +1,6 @@
 """A simple script to scatter a (filtered) subreadset into units of input files.
 """
-from pbcore.io import (SubreadSet, ExternalResource)
+from pbcore.io import (SubreadSet, ExternalResource) # pylint: disable=import-error
 import argparse
 import logging
 import os
