@@ -16,13 +16,13 @@ LOG = logging.getLogger(__name__)
 
 
 TASK_BAM2DEXTA_SPLIT_SCRIPT = """\
-python -m falcon_kit.mains.bam2dexta --config-fn={input.config} split  --wildcards={params.wildcards} --bam={input.bam} --split-fn={output.split} --bash-template-fn={output.bash_template}
+python -m falcon_kit.mains.bam2dexta split  --wildcards={params.wildcards} --bam={input.bam} --split-fn={output.split} --bash-template-fn={output.bash_template}
 """
 TASK_BAM2DEXTA_APPLY_SCRIPT = """\
-python -m falcon_kit.mains.bam2dexta --config-fn={input.config} apply  --bam-fn={input.bam} --dexta-fn={output.dexta}
+python -m falcon_kit.mains.bam2dexta apply  --bam-fn={input.bam} --dexta-fn={output.dexta}
 """
 TASK_BAM2DEXTA_COMBINE_SCRIPT = """\
-python -m falcon_kit.mains.bam2dexta --config-fn={input.config} combine  --gathered-fn={input.gathered} --dexta-fofn-fn={output.fofn}
+python -m falcon_kit.mains.bam2dexta combine  --gathered-fn={input.gathered} --dexta-fofn-fn={output.fofn}
 """
 TASK_CONSENSUS_SPLIT_SCRIPT = """\
 python -m falcon_kit.mains.consensus_split --wildcards={params.wildcards} --p-id2las-fn={input.p_id2las} --db-fn={input.raw_reads_db} --length-cutoff-fn={input.length_cutoff} --config-fn={input.config} --split-fn={output.split} --bash-template-fn={output.bash_template}
