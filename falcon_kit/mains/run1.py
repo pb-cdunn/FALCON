@@ -77,44 +77,9 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
             )
 
 
-def run(wf, config, rule_writer,
-        config_fn,
-        input_fofn_plf,
-        ):
-    """
-    Preconditions (for now):
-    * LOG
-    * run_run_support.logger
-    """
-    parsed_config = io.deserialize(config_fn)
-    if parsed_config != config:
-        msg = 'Config from {!r} != passed config'.format(config_fn)
-        raise Exception(msg)
-    general_config = config['General']
-    general_config_fn = os.path.join(os.path.dirname(config_fn), 'General_config.json')
-    io.serialize(general_config_fn, general_config) # Some tasks use this.
-    rawread_dir = '0-rawreads'
-    pread_dir = '1-preads_ovl'
-    falcon_asm_dir = '2-asm-falcon'
-
-    for d in (rawread_dir, pread_dir, falcon_asm_dir):
-        run_support.make_dirs(d)
-
-    # only matter for parallel jobs
-    job_defaults = config['job.defaults']
-    #exitOnFailure = bool(job_defaults.get('stop_all_jobs_on_failure', False))
-    global default_njobs
-    default_njobs = int(job_defaults.get('njobs', 7))
-    wf.max_jobs = default_njobs
-
-    assert general_config['input_type'] in (
-        'raw', 'preads'), 'Invalid input_type=={!r}'.format(general_config['input_type'])
-
-    parameters = {}
-
-    if general_config['input_type'] == 'raw':
-        # Most common workflow: Start with rawreads.
-
+def add_bam2dexta_tasks(wf, config, rule_writer,
+                        config_fn,
+                        input_fofn_plf):
         # run bam2dexta
         bam2dexta_uows_fn = os.path.join(
             rawread_dir, 'bam2dexta-split', 'bam2dexta-uows.json')
@@ -169,6 +134,46 @@ def run(wf, config, rule_writer,
             dist=Dist(local=True),
         ))
 
+        return gathered_fn, input_fofn_fn
+
+def run(wf, config, rule_writer,
+        config_fn,
+        input_fofn_plf,
+        ):
+    """
+    Preconditions (for now):
+    * LOG
+    * run_run_support.logger
+    """
+    parsed_config = io.deserialize(config_fn)
+    if parsed_config != config:
+        msg = 'Config from {!r} != passed config'.format(config_fn)
+        raise Exception(msg)
+    general_config = config['General']
+    general_config_fn = os.path.join(os.path.dirname(config_fn), 'General_config.json')
+    io.serialize(general_config_fn, general_config) # Some tasks use this.
+    rawread_dir = '0-rawreads'
+    pread_dir = '1-preads_ovl'
+    falcon_asm_dir = '2-asm-falcon'
+
+    for d in (rawread_dir, pread_dir, falcon_asm_dir):
+        run_support.make_dirs(d)
+
+    # only matter for parallel jobs
+    job_defaults = config['job.defaults']
+    #exitOnFailure = bool(job_defaults.get('stop_all_jobs_on_failure', False))
+    global default_njobs
+    default_njobs = int(job_defaults.get('njobs', 7))
+    wf.max_jobs = default_njobs
+
+    assert general_config['input_type'] in (
+        'raw', 'preads'), 'Invalid input_type=={!r}'.format(general_config['input_type'])
+
+    parameters = {}
+
+    if general_config['input_type'] == 'raw':
+        # Most common workflow: Start with rawreads.
+
         # import sequences into daligner DB
         # calculate length_cutoff (if specified as -1)
         # split DB
@@ -179,8 +184,7 @@ def run(wf, config, rule_writer,
             script=pype_tasks.TASK_DB_BUILD_SCRIPT,
             inputs={
                 'config': general_config_fn,
-                'input_fofn': input_fofn_fn,
-                'bam_gathered': gathered_fn,
+                'input_fofn': fn(input_fofn_plf),
             },
             outputs={
                 'length_cutoff': length_cutoff_fn,
