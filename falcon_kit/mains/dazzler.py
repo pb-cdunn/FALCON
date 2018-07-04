@@ -86,14 +86,14 @@ def script_build_db(config, input_fofn_fn, db):
         LOG.exception('Using "cat" by default.')
         cat_fasta = 'cat '
     DBdust = 'DBdust {} {}'.format(config.get('pa_DBdust_option', ''), db)
-    fasta_filter_cmd = 'streamed-median' if config.get('median_filter_opt', False) else 'pass'
+    fasta_filter_option = config.get('fasta_filter_option', 'pass')
     params.update(locals())
     script = """\
 echo "PBFALCON_ERRFILE=$PBFALCON_ERRFILE"
 set -o pipefail
 rm -f {db}.db .{db}.* # in case of re-run
 #fc_fasta2fasta < {input_fofn_fn} >| fc.fofn
-while read fn; do  {cat_fasta} ${{fn}} | python -m falcon_kit.mains.fasta_filter {fasta_filter_cmd} - | fasta2DB -v {db} -i${{fn##*/}}; done < {input_fofn_fn}
+while read fn; do  {cat_fasta} ${{fn}} | python -m falcon_kit.mains.fasta_filter {fasta_filter_option} - | fasta2DB -v {db} -i${{fn##*/}}; done < {input_fofn_fn}
 #cat fc.fofn | xargs rm -f
 {DBdust}
 """.format(**params)
@@ -993,14 +993,14 @@ def get_ours(config_fn, db_fn):
         ours['DBsplit_opt'] = config.get('ovlp_DBsplit_option', '')
         ours['daligner_opt'] = config.get('ovlp_daligner_option', '') + ' ' + config.get('ovlp_HPCdaligner_option', '')
         ours['user_length_cutoff'] = int(config.get('length_cutoff_pr', '0'))
-        ours['median_filter_opt'] = config.get('ovlp_use_median_filter', False)
+        ours['fasta_filter_option'] = 'pass'
     else:
         ours['DBsplit_opt'] = config.get('pa_DBsplit_option', '')
         ours['daligner_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCdaligner_option', '')
         ours['TANmask_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCTANmask_option', '')
         ours['REPmask_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCREPmask_option', '')
         ours['user_length_cutoff'] = int(config.get('length_cutoff', '0'))
-        ours['median_filter_opt'] = config.get('pa_use_median_filter', False)
+        ours['fasta_filter_option'] = config.get('pa_fasta_filter_option', 'pass')
 
     LOG.info('config({!r}):\n{}'.format(config_fn, config))
     LOG.info('our subset of config:\n{}'.format(ours))
