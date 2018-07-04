@@ -71,7 +71,7 @@ def yield_zmwtuples(records):
                         subread_header=record.name, subread_id=0)
         yield zrec
 
-def run_streamed_median(fp_in, fp_out, fn='-'):
+def run_streamed_median(fp_in, fp_out, fn='-', zmw_filter_func=median_zmw_subread):
     fasta_records = FastaReader.yield_fasta_records(fp_in, fn, log=LOG.info)
     for zmw_id, zmw_subreads in itertools.groupby(yield_zmwtuples(fasta_records), lambda x: x.zmw_id):
         median_zrec = median_zmw_subread(list(zmw_subreads))
@@ -131,9 +131,14 @@ def run_median_filter(fp_in, fp_out, fn, zmw_filter_func=median_zmw_subread):
 ###############################
 ### Internal median filter. ###
 ###############################
-
 def run_internal_median_filter(fp_in, fp_out, fn):
     run_median_filter(fp_in, fp_out, fn, zmw_filter_func=internal_median_zmw_subread)
+
+#######################################
+### Streamed internal median filter ###
+#######################################
+def run_streamed_internal_median_filter(fp_in, fp_out, fn='-'):
+    run_streamed_median(fp_in, fp_out, fn=fn, zmw_filter_func=internal_median_zmw_subread)
 
 ##############################
 ### Main and cmds.         ###
@@ -163,6 +168,10 @@ def cmd_run_internal_median_filter(args):
     with open(args.input_path, 'r') as fp_in:
         run_internal_median_filter(fp_in, sys.stdout, args.input_path)
 
+def cmd_run_streamed_internal_median_filter(args):
+    with open_stream(args.input_path) as fp_in:
+        run_streamed_internal_median_filter(fp_in, sys.stdout, args.input_path)
+
 class HelpF(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
 
@@ -179,6 +188,7 @@ def parse_args(argv):
     help_median = 'Applies the median-length ZMW filter by running two passes over the data. Only one subread per ZMW is output, based on median-length selection. The input_path needs to be a file.'
     help_streamed_median = 'Applies the median-length ZMW filter by running a single-pass over the data. The input subreads should be groupped by ZMW. If input_path is "-", input is read from stdin.'
     help_internal_median = 'Applies the median-length ZMW filter only on internal subreads (ZMWs with >= 3 subreads) by running two passes over the data. For ZMWs with < 3 subreads, the maximum-length one is selected. The input_path needs to be a file.'
+    help_streamed_internal_median = 'Applies the median-length ZMW filter only on internal subreads (ZMWs with >= 3 subreads) by running a single pass over the data. The input subreads should be groupped by ZMW. For ZMWs with < 3 subreads, the maximum-length one is selected. If input_path is "-", input is read from stdin.'
 
     parser_pass = subparsers.add_parser('pass',
             formatter_class=HelpF,
@@ -201,8 +211,14 @@ def parse_args(argv):
     parser_internal_median = subparsers.add_parser('internal-median',
             formatter_class=HelpF,
             description=help_internal_median,
-            help=help_median)
+            help=help_internal_median)
     parser_internal_median.set_defaults(func=cmd_run_internal_median_filter)
+
+    parser_streamed_internal_median = subparsers.add_parser('streamed-internal-median',
+            formatter_class=HelpF,
+            description=help_streamed_internal_median,
+            help=help_streamed_internal_median)
+    parser_streamed_internal_median.set_defaults(func=cmd_run_streamed_internal_median_filter)
 
     parser.add_argument('input_path', help='Input PacBio FASTA file')
 
