@@ -384,3 +384,11 @@ def test_main_cmd_median_1(tmpdir, capsys):
 def test_main_cmd_internal_median_1(tmpdir, capsys):
     in_fa_file = tmpdir.join('in.fa')
     check_main_from_file('internal-median', fasta_tests[4], expected_tests[4], in_fa_file, capsys)
+
+def test_main_cmd_streamed_internal_median_1(tmpdir, capsys):
+    check_main_from_stdin('streamed-internal-median', fasta_tests[4], expected_tests[4], capsys)
+
+def test_main_cmd_streamed_internal_median_2(tmpdir, capsys):
+    in_fa_file = tmpdir.join('in.fa')
+    check_main_from_file('streamed-internal-median', fasta_tests[4], expected_tests[4], in_fa_file, capsys)
+
