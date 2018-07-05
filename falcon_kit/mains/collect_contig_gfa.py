@@ -44,6 +44,7 @@ def run(fp_out, p_ctg_tiling_path, a_ctg_tiling_path,
     for ctg_id, tiling_path in a_paths.iteritems():
         gfa_graph.add_node(ctg_id, a_ctg_lens[ctg_id], a_ctg_seqs[ctg_id])
 
+    # Add edges between primary and associate contigs.
     for p_ctg_id, a_dict in a_placement.iteritems():
         for a_ctg_id, placement in a_dict.iteritems():
             start, end, p_ctg_id, a_ctg_id, first_node, last_node = placement
@@ -57,6 +58,16 @@ def run(fp_out, p_ctg_tiling_path, a_ctg_tiling_path,
             # edge_name = 'edge-%d-in-%s-to-%s' % (len(gfa_graph.edges), a_ctg_id, p_ctg_id)
             edge_name = 'edge-%d' % (len(gfa_graph.edges))
             gfa_graph.add_edge(edge_name, a_ctg_id, '+', p_ctg_id, '+', a_ctg_len, a_ctg_len, end, end, '*', tags = {}, labels = {})
+
+    # Add circular edges to the primary contigs, if they exist.
+    for ctg_id, tiling_path in p_paths.iteritems():
+        if len(tiling_path.edges) == 0:
+            continue
+        if tiling_path.edges[0].v != tiling_path.edges[-1].w:
+            continue
+        p_len = p_ctg_lens[ctg_id]
+        edge_name = 'edge-%d' % (len(gfa_graph.edges))
+        gfa_graph.add_edge(edge_name, ctg_id, '+', ctg_id, '+', p_len, p_len, 0, 0, '*', tags = {}, labels = {})
 
     fp_out.write(serialize_gfa(gfa_graph))
     fp_out.write('\n')

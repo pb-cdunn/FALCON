@@ -2,8 +2,10 @@ import helpers
 import pytest
 import falcon_kit.functional as f
 import collections
+import logging
 import os
 import re
+import StringIO
 
 thisdir = os.path.dirname(os.path.abspath(__file__))
 example_HPCdaligner_fn = os.path.join(thisdir, 'HPCdaligner_synth0_new.sh')
@@ -20,8 +22,8 @@ def test_get_daligner_job_descriptions():
     result = f.get_daligner_job_descriptions(
         example_HPCdaligner, 'raw_reads')
     assert result
-    import sys, pprint
-    sys.stderr.write(pprint.pformat(result))
+    #import sys, pprint
+    #sys.stderr.write(pprint.pformat(result))
     helpers.equal_multiline(result[('.1', '.1')], 'daligner -v -w1 -h1 -t50 -H2000 -e0.99 -l1 -s1000 -P=. -mdust raw_reads.1 raw_reads.1\nLAcheck -v raw_reads *.las\n')
     helpers.equal_multiline(result[('.2', '.1', '.2')], 'daligner -v -w1 -h1 -t50 -H2000 -e0.99 -l1 -s1000 -P=. -mdust raw_reads.2 raw_reads.1 raw_reads.2\nLAcheck -v raw_reads *.las\n')
     eq_(len(result), 2)
@@ -278,6 +280,43 @@ def test_args_from_line():
     las_files = [word + '.las' for word in f.yield_args_from_line(
         line) for line in bash_lines if line.startswith('LAmerge')][1:]
 
+
+def test_parse_REPmask_code(caplog):
+    code = '1,111;2,222;2,333'
+    with pytest.raises(Exception) as excinfo:
+        f.parse_REPmask_code(code)
+    assert 'group sizes must not match' in str(excinfo.value)
+
+    code = '2,111;3,222;1,333'
+    with pytest.raises(Exception) as excinfo:
+        f.parse_REPmask_code(code)
+    assert 'group sizes must increase monotonically' in str(excinfo.value)
+
+    code = '???'
+    expected = [(0, 0), (0, 0), (0, 0)]
+    with caplog.at_level(logging.CRITICAL):
+        # I am not sure how to capture stderr, but we can capture logging easily.
+        got = f.parse_REPmask_code(code)
+    assert got == expected
+
+    code = '1,111;2,222;3,333'
+    assert f.parse_REPmask_code(code) == [(1,111), (2,222), (3,333)]
+
+    code = '1,300;0,300;0,300'
+    assert f.parse_REPmask_code(code) == [(1,300), (0,300), (0,300)]
+
+
+sample_db = """\
+files =         1
+         50 subreads.dexta m000_000
+blocks =         2
+size =      65536 cutoff =         5 all = 1
+         0         0
+        33        33
+        50        50
+"""
+def test_dazzler_get_nblocks():
+    assert 2 == f.dazzler_get_nblocks(StringIO.StringIO(sample_db))
 
 from falcon_kit.util import io
 

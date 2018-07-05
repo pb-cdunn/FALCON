@@ -92,16 +92,14 @@ def make_job_data(url, script_fn):
     return job_data
 
 
-def update_HPCdaligner_option(option):
+def check_HPCdaligner_option(option):
+    msg = ''
     if '-dal' in option:
-        logger.warning(
-            'HPC.daligner option "-dal" has changed to "-B". Correcting this for you.')
-        option = option.replace('-dal', '-B')
+        msg += 'HPC.daligner option "-dal" has changed to "-B".\n'
     if '-deg' in option:
-        logger.warning(
-            'HPC.daligner option "-deg" has changed to "-D". Correcting this for you.')
-        option = option.replace('-deg', '-D')
-    return option
+        msg += 'HPC.daligner option "-deg" has changed to "-D".\n'
+    if msg:
+        raise Exception(msg)
 
 
 def clean_falcon_options(fc):
@@ -114,7 +112,7 @@ def clean_falcon_options(fc):
         update_dash_flags(fc, key)
     for dk in ('pa_HPCdaligner_option', 'ovlp_HPCdaligner_option'):
         if dk in fc:
-            fc[dk] = update_HPCdaligner_option(fc[dk])
+            check_HPCdaligner_option(fc[dk])
 
 
 def get_config(config):
@@ -352,11 +350,17 @@ def update_defaults(cfg):
             cfg[key] = val
     set_default('input_type', 'raw')
     set_default('overlap_filtering_setting', '--max-diff 1000 --max-cov 1000 --min-cov 2')
-    set_default('pa_HPCdaligner_option', '-v -D24 -t16 -e.70 -l1000 -s100')
-    set_default('ovlp_HPCdaligner_option', '-v -D24 -t32 -h60 -e.96 -l500 -s1000')
+    #set_default('pa_daligner_option', '-e.70 -s100 -t16') # TODO: -t is a dumb default
+    #set_default('ovlp_daligner_option', '-e.96 -s1000 -h60 -t32') # TODO: -t is a dumb default
+    set_default('pa_HPCdaligner_option', '-v -D24')
+    set_default('ovlp_HPCdaligner_option', '-v -D24 -l500')
+    set_default('pa_HPCTANmask_option', '-l500') # daligner defaults to -l1000
+    set_default('ovlp_HPCTANmask_option', '-l500')
+    set_default('pa_REPmask_code', '1,300;0,300;0,300')
     set_default('pa_DBsplit_option', '-x500 -s200')
     set_default('skip_checks', False)
     set_default('pa_DBdust_option', '') # Gene recommends the defaults. I have tried -w128 -t2.5 -m20
+    set_default('pa_fasta_filter_option', 'streamed-median')
     set_default('dazcon', False)
     set_default('pa_dazcon_option', '-j 4 -x -l 500')
     set_default('ovlp_DBsplit_option', '-x500 -s200')
@@ -441,11 +445,16 @@ def check_unexpected_keys(cfg):
         'dazcon',
         'pa_dazcon_option',
         'pa_DBdust_option',
+        'pa_fasta_filter_option',
         'pa_DBsplit_option',
         'pa_HPCTANmask_option',
+        'pa_HPCREPmask_option',
+        'pa_REPmask_code',
+        'pa_daligner_option',
         'pa_HPCdaligner_option',
         'ovlp_DBsplit_option',
-        'ovlp_HPCTANmask_option',
+        #'ovlp_HPCTANmask_option',
+        'ovlp_daligner_option',
         'ovlp_HPCdaligner_option',
         'skip_checks',
         'falcon_sense_option',
@@ -534,23 +543,6 @@ def setup_logger(logging_config_fn):
         pass
 
     return logger
-
-
-def get_nblock(db_file):
-    """Return #blocks in dazzler-db.
-    """
-    nblock = 1
-    new_db = True
-    if os.path.exists(db_file):
-        with open(db_file) as f:
-            for l in f:
-                l = l.strip().split()
-                if l[0] == "blocks" and l[1] == "=":
-                    nblock = int(l[2])
-                    new_db = False
-                    break
-    # Ignore new_db for now.
-    return nblock
 
 
 def daligner_gather_las(job_rundirs):

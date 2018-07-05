@@ -1,13 +1,14 @@
 from __future__ import absolute_import
 
 from ..pype import (wrap_gen_task as gen_task, gen_parallel_tasks, Dist)
-from .. import run_support as support
+from .. import run_support
 from .. import bash, pype_tasks, snakemake
 from ..util.system import (only_these_symlinks, lfs_setstripe_maybe)
 from .. import io
+from .. import functional
 # pylint: disable=no-name-in-module, import-error, fixme, line-too-long
 from pypeflow.simple_pwatcher_bridge import (PypeProcWatcherWorkflow, MyFakePypeThreadTaskBase,
-                                             makePypeLocalFile, fn, PypeTask)
+                                             makePypeLocalFile, PypeTask)
 import argparse
 import glob
 import json
@@ -20,15 +21,35 @@ import time
 
 LOG = logging.getLogger(__name__)  # default, for remote tasks
 
+def check_general_config(general_config, input_config_fn):
+    if ('pa_daligner_option' not in general_config or
+        'ovlp_daligner_option' not in general_config):
+        msg = '''Missing options.
+We now require both "pa_daligner_option" (stage 0) and "ovlp_daligner_option" (stage 1),
+which are automatically passed along to
+  HPC.daligner
+  HPC.TANmask
+  HPC.REPmask
+
+These can provide additional flags:
+  pa_HPCdaligner_option
+  pa_HPCTANmask_option
+  ovlp_HPCdaligner_option
+  pa_REPmask_code (-g/-c pairs for 3 iterations, e.g. '1,20;5,15;20,10')
+'''
+        raise Exception(msg)
+    required = ('input_fofn', 'genome_size')
+    for name in required:
+        assert name in general_config, 'Missing "{}" in {}.'.format(name, input_config_fn)
 
 def main1(prog_name, input_config_fn, logger_config_fn=None):
     global LOG
-    LOG = support.setup_logger(logger_config_fn)
+    LOG = run_support.setup_logger(logger_config_fn)
     lfs_setstripe_maybe(path='.', stripe=12)
 
     LOG.info('fc_run started with configuration %s', input_config_fn)
     try:
-        config = support.parse_cfg_file(input_config_fn)
+        config = run_support.parse_cfg_file(input_config_fn)
         import json
         dumped = json.dumps(config, indent=2, separators=(',', ': '), sort_keys=True)
         LOG.info('cfg=\n{}'.format(dumped))
@@ -36,9 +57,9 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
         LOG.exception('Failed to parse config "{}".'.format(input_config_fn))
         raise
     general_config = config['General']
-    assert 'input_fofn' in general_config, 'Missing "input_fofn" in {}.'.format(input_config_fn)
-    input_fofn_plf = makePypeLocalFile(general_config['input_fofn'])
-    genome_size = int(general_config.get('genome_size', '0'))
+    check_general_config(general_config, input_config_fn)
+    input_fofn_fn = general_config['input_fofn']
+    genome_size = int(general_config['genome_size'])
     squash = True if 0 < genome_size < 1000000 else False
     wf = PypeProcWatcherWorkflow(job_defaults=config['job.defaults'],
                                  squash=squash,
@@ -52,18 +73,79 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
         rule_writer = snakemake.SnakemakeRuleWriter(snakemake_writer)
         run(wf, config, rule_writer,
             os.path.abspath(config_fn),
-            input_fofn_plf=input_fofn_plf,
+            input_fofn_fn=input_fofn_fn,
             )
+
+
+def add_bam2dexta_tasks(
+            wf, rule_writer,
+            config,
+            input_fofn_fn, rawread_dir):
+        # run bam2dexta
+        bam2dexta_uows_fn = os.path.join(
+            rawread_dir, 'bam2dexta-split', 'bam2dexta-uows.json')
+        bam2dexta_bash_template_fn = os.path.join(
+            rawread_dir, 'bam2dexta-split', 'bash_template.sh')
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_BAM2DEXTA_SPLIT_SCRIPT,
+            inputs={
+                'bam': input_fofn_fn,
+            },
+            outputs={
+                'split': bam2dexta_uows_fn,
+                'bash_template': bam2dexta_bash_template_fn,
+            },
+            parameters={
+                'wildcards': 'bam2dexta_id',
+            },
+            rule_writer=rule_writer,
+            dist=Dist(local=True),
+        ))
+
+        gathered_fn = os.path.join(rawread_dir, 'bam2dexta-gathered', 'gathered-dexta-files.json')
+        gen_parallel_tasks(
+            wf, rule_writer,
+            bam2dexta_uows_fn, gathered_fn,
+            run_dict=dict(
+                bash_template_fn=bam2dexta_bash_template_fn,
+                script='fubar-TODO', #pype_tasks.TASK_DB_TAN_APPLY_SCRIPT, # for snakemake stuff
+                inputs={
+                    'units_of_work': '0-rawreads/bam2dexta-chunks/{bam2dexta_id}/some-units-of-work.json',
+                },
+                outputs={
+                    'results': '0-rawreads/bam2dexta-runs/{bam2dexta_id}/some-done-files.json',
+                },
+                parameters={},
+
+            ),
+            dist=Dist(NPROC=1, MB=4000, job_dict=config['job.step.da']),
+        )
+
+        input_fofn_fn = os.path.join(rawread_dir, 'bam2dexta-combine', 'input.fofn')
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_BAM2DEXTA_COMBINE_SCRIPT,
+            inputs={
+                'gathered': gathered_fn,
+            },
+            outputs={
+                'fofn': input_fofn_fn,
+            },
+            parameters={},
+            rule_writer=rule_writer,
+            dist=Dist(local=True),
+        ))
+
+        return input_fofn_fn
 
 
 def run(wf, config, rule_writer,
         config_fn,
-        input_fofn_plf,
+        input_fofn_fn,
         ):
     """
     Preconditions (for now):
     * LOG
-    * run_support.logger
+    * run_run_support.logger
     """
     parsed_config = io.deserialize(config_fn)
     if parsed_config != config:
@@ -77,7 +159,7 @@ def run(wf, config, rule_writer,
     falcon_asm_dir = '2-asm-falcon'
 
     for d in (rawread_dir, pread_dir, falcon_asm_dir):
-        support.make_dirs(d)
+        run_support.make_dirs(d)
 
     # only matter for parallel jobs
     job_defaults = config['job.defaults']
@@ -94,6 +176,9 @@ def run(wf, config, rule_writer,
     if general_config['input_type'] == 'raw':
         # Most common workflow: Start with rawreads.
 
+        if input_fofn_fn.endswith('.xml'):
+            input_fofn_fn = add_bam2dexta_tasks(wf, rule_writer, config, input_fofn_fn, rawread_dir)
+
         # import sequences into daligner DB
         # calculate length_cutoff (if specified as -1)
         # split DB
@@ -104,7 +189,7 @@ def run(wf, config, rule_writer,
             script=pype_tasks.TASK_DB_BUILD_SCRIPT,
             inputs={
                 'config': general_config_fn,
-                'input_fofn': fn(input_fofn_plf),
+                'input_fofn': input_fofn_fn,
             },
             outputs={
                 'length_cutoff': length_cutoff_fn,
@@ -173,7 +258,32 @@ def run(wf, config, rule_writer,
             dist=Dist(local=True),
         ))
 
-        ####
+        #### HPC.REPmask/daligner/LAmerge
+        codes = functional.parse_REPmask_code(general_config['pa_REPmask_code'])
+        LOG.info('Parsed pa_REPmask_code (repa,repb,repc): {!r}'.format(codes))
+
+        ### REPmask tasks (a, b, c)
+        letter = 'a'
+        group_size, coverage_limit = codes[0]
+        i_db_fn = r_db_tan_fn
+        o_db_fn = add_rep_tasks(wf, rule_writer, rawread_dir, config, general_config,
+                general_config_fn, i_db_fn, length_cutoff_fn,
+                letter, group_size, coverage_limit)
+        letter = 'b'
+        group_size, coverage_limit = codes[1]
+        i_db_fn = o_db_fn
+        o_db_fn = add_rep_tasks(wf, rule_writer, rawread_dir, config, general_config,
+                general_config_fn, i_db_fn, length_cutoff_fn,
+                letter, group_size, coverage_limit)
+        letter = 'c'
+        group_size, coverage_limit = codes[2]
+        i_db_fn = o_db_fn
+        o_db_fn = add_rep_tasks(wf, rule_writer, rawread_dir, config, general_config,
+                general_config_fn, i_db_fn, length_cutoff_fn,
+                letter, group_size, coverage_limit)
+        r_db_rep_fn = o_db_fn
+
+        #### basic daligner/LAmerge
         p_id2las_fn = os.path.join(rawread_dir, 'las-merge-combine', 'p_id2las.json')
         las_fofn_fn = os.path.join(rawread_dir, 'las-merge-combine', 'las_fofn.json')
 
@@ -181,11 +291,12 @@ def run(wf, config, rule_writer,
             wf, rule_writer,
             general_config, config['job.step.da'], config['job.step.la'],
             rawread_dir,
-            general_config_fn, r_db_tan_fn,
+            general_config_fn, r_db_rep_fn,
             length_cutoff_fn,
             p_id2las_fn, las_fofn_fn,
             daligner_wildcard='dal0_id',
             lamerge_wildcard='mer0_id',
+            daligner_params={},
             db_prefix='raw_reads', # TODO: Infer
             daligner_split_script=pype_tasks.TASK_DB_DALIGNER_SPLIT_SCRIPT,
         )
@@ -207,7 +318,7 @@ def run(wf, config, rule_writer,
             script=pype_tasks.TASK_CONSENSUS_SPLIT_SCRIPT,
             inputs={
                 'p_id2las': p_id2las_fn,
-                'raw_reads_db': r_db_tan_fn,
+                'raw_reads_db': r_db_rep_fn,
                 'length_cutoff': length_cutoff_fn,
                 'config': general_config_fn,
             },
@@ -229,7 +340,7 @@ def run(wf, config, rule_writer,
                 script=pype_tasks.TASK_CONSENSUS_TASK_SCRIPT, # for snakemake only
                 inputs = {
                     #'las': '0-rawreads/cns-split/{cns0_id}/merged.{cns0_id2}.las',
-                    #'db': r_db_tan_fn,
+                    #'db': r_db_rep_fn,
                     #'length_cutoff': length_cutoff_fn,
                     #'config': general_config_fn,
                     'units_of_work': '0-rawreads/cns-chunks/{cns0_id}/some-units-of-work.json',
@@ -264,7 +375,7 @@ def run(wf, config, rule_writer,
         wf.addTask(gen_task(
             script=pype_tasks.TASK_REPORT_PRE_ASSEMBLY_SCRIPT,
             inputs={'length_cutoff': length_cutoff_fn,
-                    'raw_reads_db': r_db_tan_fn,
+                    'raw_reads_db': r_db_rep_fn,
                     'preads_fofn': preads_fofn_fn,
                     'config': general_config_fn,
             },
@@ -320,7 +431,8 @@ def run(wf, config, rule_writer,
         length_cutoff_pr_fn,
         p_id2las_fn, las_fofn_fn,
         daligner_wildcard='dal1_id',
-        lamerge_wildcard='mer0_id', # mer0_id is hard-coded in dazzler, for now
+        lamerge_wildcard='mer1_id',
+        daligner_params={},
         db_prefix='preads', # TODO: Infer
         daligner_split_script=pype_tasks.TASK_DB_DALIGNER_SPLIT_SCRIPT,
     )
@@ -374,6 +486,7 @@ def add_daligner_and_merge_tasks(
         p_id2las_fn, las_fofn_fn,
         daligner_wildcard, #='dal0_id',
         lamerge_wildcard, #='mer0_id',
+        daligner_params=dict(),
         db_prefix='raw_reads',
         daligner_split_script=pype_tasks.TASK_DB_DALIGNER_SPLIT_SCRIPT,
     ):
@@ -390,7 +503,7 @@ def add_daligner_and_merge_tasks(
         super_dir, 'daligner-split', 'all-units-of-work.json')
     daligner_bash_template_fn = os.path.join(
         super_dir, 'daligner-split', 'daligner_bash_template.sh')
-    params = dict(parameters)
+    params = dict(daligner_params)
     params['skip_checks'] = int(general_config.get('skip_checks', 0))
     params['wildcards'] = daligner_wildcard
     wf.addTask(gen_task(
@@ -501,6 +614,109 @@ def add_daligner_and_merge_tasks(
 
     wf.max_jobs = max_jobs
 
+
+def add_rep_tasks(
+        wf, rule_writer,
+        rawread_dir, config, general_config,
+        general_config_fn, i_db_fn, length_cutoff_fn,
+        letter, group_size, coverage_limit,
+        ):
+        """
+        Add daligner/lamerge/REPmask parallel tasks for one iteration of repeat-masking.
+        TODO: Make the tasks no-ops if the codes are zero (or something like that).
+        """
+        name = 'rep{}'.format(letter)
+        rep_dir = os.path.join(rawread_dir, name)
+        o_db_rep_fn = os.path.join(rep_dir, 'rep-combine', 'raw_reads.db')
+
+        p_id2las_fn = os.path.join(rep_dir, 'las-merge-combine', 'p_id2las.json')
+        las_fofn_fn = os.path.join(rep_dir, 'las-merge-combine', 'las_fofn.json')
+
+        rep_daligner_params = dict(
+            group_size=group_size, coverage_limit=coverage_limit,
+        )
+        add_daligner_and_merge_tasks(
+            wf, rule_writer,
+            general_config, config['job.step.da'], config['job.step.la'],
+            rep_dir,
+            general_config_fn, i_db_fn,
+            length_cutoff_fn,
+            p_id2las_fn, las_fofn_fn,
+            daligner_wildcard='dal0{}_id'.format(letter),
+            lamerge_wildcard='mer0{}_id'.format(letter),
+            daligner_params=rep_daligner_params,
+            db_prefix='raw_reads', # TODO: Infer
+            daligner_split_script=pype_tasks.TASK_DB_REP_DALIGNER_SPLIT_SCRIPT,
+        )
+
+        ### REPmask
+        # rep-split
+        # We assume that daligner/LAmerge have already run.
+        # Instead of using the REP.mask calls from rep-jobs.05.MASK,
+        # we construct our own.
+        rep_uows_fn = os.path.join(
+            rep_dir, 'rep-split', 'rep-uows.json')
+        rep_bash_template_fn = os.path.join(
+            rep_dir, 'rep-split', 'bash_template.sh')
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_DB_REP_SPLIT_SCRIPT,
+            inputs={
+                'config': general_config_fn,
+                'db': i_db_fn,
+                'las_paths': las_fofn_fn,
+            },
+            outputs={
+                'split': rep_uows_fn,
+                'bash_template': rep_bash_template_fn,
+            },
+            parameters={
+                'group_size': group_size,
+                'coverage_limit': coverage_limit,
+                'wildcards': '{}_id'.format(name),
+            },
+            rule_writer=rule_writer,
+            dist=Dist(NPROC=1),
+        ))
+
+        # rep-apply
+        gathered_fn = os.path.join(rep_dir, 'rep-gathered', 'gathered-done-files.json')
+        gen_parallel_tasks(
+            wf, rule_writer,
+            rep_uows_fn, gathered_fn,
+            run_dict=dict(
+                bash_template_fn=rep_bash_template_fn,
+                script='fubar-TODO', #pype_tasks.TASK_DB_REP_APPLY_SCRIPT, # for snakemake stuff
+                inputs={
+                    'units_of_work': '0-rawreads/%(name)s/rep-chunks/{%(name)s_id}/some-units-of-work.json'%locals(),
+                },
+                outputs={
+                    'results': '0-rawreads/%(name)s/rep-runs/{%(name)s_id}/some-done-files.json'%locals(),
+                },
+                parameters={},
+
+            ),
+            dist=Dist(NPROC=4, MB=4000, job_dict=config['job.step.da']),
+        )
+
+        # rep-combine
+        wf.addTask(gen_task(
+            script=pype_tasks.TASK_DB_REP_COMBINE_SCRIPT,
+            inputs={
+                'config': general_config_fn,
+                'db': i_db_fn,
+                'gathered': gathered_fn,
+            },
+            outputs={
+                'new_db': o_db_rep_fn,
+            },
+            parameters={
+                'group_size': group_size,
+            },
+            rule_writer=rule_writer,
+            dist=Dist(local=True),
+        ))
+
+        return o_db_rep_fn
 
 
 def main(argv=sys.argv):

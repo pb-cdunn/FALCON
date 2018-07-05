@@ -27,8 +27,8 @@ make wheel
 
 # http://bamboo.pacificbiosciences.com:8085/build/admin/edit/defaultBuildArtifact.action?buildKey=SAT-TAGDEPS-JOB1
 # For old artifact config:
-mkdir -p ./artifacts/gcc-6.4.0/wheelhouse
-rsync -av ${WHEELHOUSE}/falcon*.whl artifacts/gcc-6.4.0/wheelhouse/
+#mkdir -p ./artifacts/gcc-6.4.0/wheelhouse
+#rsync -av ${WHEELHOUSE}/falcon*.whl artifacts/gcc-6.4.0/wheelhouse/
 
 
 # Select export dir based on Bamboo branch, but only for develop and master.
