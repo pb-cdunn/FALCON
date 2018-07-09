@@ -356,7 +356,7 @@ def update_defaults(cfg):
     set_default('ovlp_HPCdaligner_option', '-v -D24 -l500')
     set_default('pa_HPCTANmask_option', '-l500') # daligner defaults to -l1000
     set_default('ovlp_HPCTANmask_option', '-l500')
-    set_default('pa_REPmask_code', '1,300;0,300;0,300')
+    set_default('pa_REPmask_code', '0,300;0,300;0,300')
     set_default('pa_DBsplit_option', '-x500 -s200')
     set_default('skip_checks', False)
     set_default('pa_DBdust_option', '') # Gene recommends the defaults. I have tried -w128 -t2.5 -m20
