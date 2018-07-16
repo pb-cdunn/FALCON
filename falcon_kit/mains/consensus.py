@@ -14,6 +14,7 @@ import os
 import re
 import sys
 import falcon_kit
+import falcon_kit.util.io as io
 
 LOG = logging.getLogger()
 
@@ -253,8 +254,6 @@ def parse_args(argv):
 def run(args):
     logging.basicConfig(level=int(round(10*args.verbose_level)))
 
-    good_region = re.compile("[ACGT]+")
-
     assert args.n_core <= multiprocessing.cpu_count(), 'Requested n_core={} > cpu_count={}'.format(
             args.n_core, multiprocessing.cpu_count())
 
@@ -271,10 +270,25 @@ def run(args):
     config = args.min_cov, K, \
         args.max_n_read, args.min_idt, args.edge_tolerance, args.trim_size, args.min_cov_aln, args.max_cov_aln
     # TODO: pass config object, not tuple, so we can add fields
-    for res in exe_pool.imap(get_consensus, get_seq_data(config, args.min_n_read, args.min_len_aln)):
+    inputs = []
+    for datum in get_seq_data(config, args.min_n_read, args.min_len_aln):
+        inputs.append((get_consensus, datum))
+    try:
+        LOG.info('running {!r}'.format(get_consensus))
+        for res in exe_pool.imap(io.run_func, inputs):
+            process_get_consensus_result(res, args)
+        LOG.info('finished {!r}'.format(get_consensus))
+    except:
+        LOG.exception('failed gen_consensus')
+        exe_pool.terminate()
+        raise
+
+good_region = re.compile("[ACGT]+")
+
+def process_get_consensus_result(res, args):
         cns, seed_id = res
         if len(cns) < 500:
-            continue
+            return
 
         if args.output_full:
             print(">" + seed_id + "_f")
@@ -282,12 +296,12 @@ def run(args):
         else:
             cns = good_region.findall(cns)
             if len(cns) == 0:
-                continue
+                return
             if args.output_multi:
                 seq_i = 0
                 for cns_seq in cns:
                     if len(cns_seq) < 500:
-                        continue
+                        return
                     if seq_i >= 10:
                         break
                     print(">prolog/%s%01d/%d_%d" % (seed_id, seq_i, 0, len(cns_seq)))
