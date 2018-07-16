@@ -343,10 +343,10 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
     }
     static msa_pos_t * msa_array = NULL;
     if ( msa_array == NULL) {
-        msa_array = get_msa_working_sapce(max_t_len);
+        msa_array = get_msa_working_sapce(max_t_len + 1);
     }
 
-    assert(t_len < max_t_len);
+    assert(t_len <= max_t_len);
 
 #endif
 

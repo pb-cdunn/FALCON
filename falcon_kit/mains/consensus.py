@@ -161,7 +161,7 @@ def get_consensus_with_trim(c_input):
 
 
 def get_seq_data(config, min_n_read, min_len_aln):
-    max_len = 100000
+    max_len = 128000
     min_cov, K, max_n_read, min_idt, edge_tolerance, trim_size, min_cov_aln, max_cov_aln = config
     seqs = []
     seed_id = None
