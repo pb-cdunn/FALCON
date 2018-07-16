@@ -111,7 +111,7 @@ def get_consensus_without_trim(c_input):
     seqs_ptr[:] = seqs
     consensus_data_ptr = falcon.generate_consensus(
         seqs_ptr, len(seqs), min_cov, K, min_idt)
-
+    assert consensus_data_ptr
     consensus = string_at(consensus_data_ptr[0].sequence)[:]
     eff_cov = consensus_data_ptr[0].eff_cov[:len(consensus)]
     LOG.debug(' Freeing1')
@@ -150,6 +150,7 @@ def get_consensus_with_trim(c_input):
     seqs_ptr[:] = trim_seqs
     consensus_data_ptr = falcon.generate_consensus(
         seqs_ptr, len(trim_seqs), min_cov, K, min_idt)
+    assert consensus_data_ptr
     consensus = string_at(consensus_data_ptr[0].sequence)[:]
     eff_cov = consensus_data_ptr[0].eff_cov[:len(consensus)]
     LOG.debug(' Freeing2')
