@@ -558,3 +558,20 @@ def dazzler_get_nblocks(db_stream):
             new_db = False
             break
     return nblock
+
+
+re_R = re.compile(r'^\+ R (\d+)')
+
+def dazzler_num_reads(dump):
+    """Given DBdump, return number of reads. (Proper DBdump call is assumed.)
+
+    >>> dazzler_num_reads('+ R 27')
+    27
+    >>> dazzler_num_reads('')
+    -1
+    """
+    mo = re_R.search(dump)
+    if mo:
+        return int(mo.group(1))
+    else:
+        return -1
