@@ -39,10 +39,17 @@ def logstats():
 
 
 def reprarg(arg):
-    if (isinstance(arg, set) or isinstance(arg, list)
+    """Reduce the size of repr()
+    """
+    if isinstance(arg, str):
+        if len(arg) > 100:
+            return '{}...({})'.format(arg[:100], len(arg))
+    elif (isinstance(arg, set) or isinstance(arg, list)
             or isinstance(arg, tuple) or isinstance(arg, dict)):
         if len(arg) > 9:
             return '%s(%d elem)' % (type(arg).__name__, len(arg))
+        else:
+            return '<' + ', '.join(reprarg(a) for a in arg) + '>'
     return repr(arg)
 
 

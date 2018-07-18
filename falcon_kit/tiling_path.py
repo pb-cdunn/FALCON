@@ -1,4 +1,4 @@
-class TilingPathEdge:
+class TilingPathEdge(object):
 
     def __init__(self, split_line = None):
         self.ctg_id, self.v, self.w, self.wrid, self.b, self.e, self.score, self.identity = \
@@ -26,7 +26,7 @@ class TilingPathEdge:
     # def __str__(self):
     #     return ' '.join(self.get_split_line())
 
-class TilingPath:
+class TilingPath(object):
     def __init__(self, tiling_edge_list, contig_sequence_len = None):
         self.edges = tiling_edge_list  # These are TilingPathEdge objects.
         self.v_to_edge = {}
@@ -44,7 +44,8 @@ class TilingPath:
         # which can be calculated from the tiling path.
         if contig_sequence_len != None:
             _, tiling_len = calc_node_coords(tiling_edge_list)
-            assert(contig_sequence_len >= tiling_len)
+            msg = 'contig_sequence_len < tiling_len ({} < {})'.format(contig_sequence_len, tiling_len)
+            assert contig_sequence_len >= tiling_len, msg
             self.first_node_offset = contig_sequence_len - tiling_len   # This is the length of the first node.
 
         # The self.coords is a dict: self.coords[v] = coordinate_on_contig
