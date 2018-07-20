@@ -1104,7 +1104,7 @@ def identify_simple_paths(sg2, edge_data):
             free_edges.remove((rw, rv))
 
             while w in simple_nodes:
-                w, w_ = sg2.out_edges(w)[0]
+                w, w_ = list(sg2.out_edges(w))[0]
                 if (w, w_) not in free_edges:
                     break
                 rw_, rw = reverse_end(w_), reverse_end(w)
@@ -1334,7 +1334,7 @@ def construct_c_path_from_utgs(ug, u_edge_data, sg):
                 path_score += score
                 # t is "simple_out" node
                 assert len(ug.out_edges(t, keys=True)) == 1
-                t0, t, v = ug.out_edges(t, keys=True)[0]
+                t0, t, v = list(ug.out_edges(t, keys=True))[0]
 
             path.append((t0, t, v))
             length, score, path_or_edges, type_ = u_edge_data[(t0, t, v)]

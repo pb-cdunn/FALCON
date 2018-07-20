@@ -6,7 +6,7 @@ import sys
 import glob
 
 install_requires = [
-    "networkx >=1.7, <=1.11",
+    "networkx >=1.9.1",
     "msgpack",
     "future >= 0.16.0",
     #"logging_tree",
