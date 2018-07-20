@@ -16,7 +16,7 @@ def touchtree(*fns):
             pass
 
 
-@pytest.yield_fixture
+#@pytest.yield_fixture
 @pytest.fixture(scope="session")
 def dirtree(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('mytmp')
