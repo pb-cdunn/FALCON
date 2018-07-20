@@ -11,6 +11,15 @@ from .. import run_support
 LOG = logging.getLogger()
 
 
+def script_run_report_pre_assembly(i_raw_reads_db_fn, i_preads_fofn_fn, genome_length, length_cutoff, o_json_fn):
+    params = dict()
+    params.update(locals())
+    script = """\
+python2.7 -m falcon_kit.mains.report_pre_assembly --genome-length {genome_length} --length-cutoff {length_cutoff} --db {i_raw_reads_db_fn} --preads-fofn {i_preads_fofn_fn} --out {o_json_fn}
+"""
+    return script.format(**params)
+
+
 def run(config_fn, length_cutoff_fn, raw_reads_db_fn, preads_fofn_fn, pre_assembly_report_fn):
     config = io.deserialize(config_fn)
     genome_length = int(config['genome_size'])
@@ -22,7 +31,7 @@ def run(config_fn, length_cutoff_fn, raw_reads_db_fn, preads_fofn_fn, pre_assemb
     # Hmmm. Actually, I think we now write the user length_cutoff into the length_cutoff file,
     # if not -1. TODO(CD): Check on that, and simplify here if so.
 
-    script = bash.script_run_report_pre_assembly(
+    script = script_run_report_pre_assembly(
         raw_reads_db_fn, preads_fofn_fn, genome_length, length_cutoff, pre_assembly_report_fn)
     script_fn = 'run-report-pre-assembly.sh'
     job_done_fn = 'job.done'

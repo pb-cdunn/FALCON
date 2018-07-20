@@ -158,7 +158,6 @@ def get_mjob_data(run_jobs_stream):
     # Strip either '&& rm ...' or '; rm ...' ?
     #re_strip_rm = re.compile(r'^(.*) ((\&\&)|;) .*$')
 
-    # Copied from scripts_merge()
     mjob_data = {}
     for l in f:
         l = l.strip()

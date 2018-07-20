@@ -545,67 +545,8 @@ def setup_logger(logging_config_fn):
     return logger
 
 
-def daligner_gather_las(job_rundirs):
-    """Return list of (block, las_fn).
-    """
-    # Could be L1.* or preads.*
-    re_las = re.compile(r'\.(\d*)(\.\d*)?\.las$')
-    for job_rundir in job_rundirs:
-        # 'out' sub-dir by convention. See run_daligner() above. (Improve that someday.)
-        for las_fn in os.listdir(job_rundir):
-            mo = re_las.search(las_fn)
-            if not mo:
-                continue
-            # We will merge in the m_* dir of the left block.
-            block = int(mo.group(1))
-            yield block, os.path.join(job_rundir, las_fn)
-
-
 def get_length_cutoff(length_cutoff, fn):
     if length_cutoff < 0:
         length_cutoff = int(open(fn).read().strip())
         logger.info('length_cutoff=%d from %r' % (length_cutoff, fn))
     return length_cutoff  # possibly updated
-
-
-def build_rdb(input_fofn_fn, config, job_done, script_fn, run_jobs_fn):
-    run_jobs_fn = os.path.basename(run_jobs_fn)
-    script = bash.script_build_rdb(config, input_fofn_fn, run_jobs_fn)
-    bash.write_script(script, script_fn, job_done)
-
-
-def build_pdb(input_fofn_fn, config, job_done, script_fn, run_jobs_fn):
-    run_jobs_fn = os.path.basename(run_jobs_fn)
-    script = bash.script_build_pdb(config, input_fofn_fn, run_jobs_fn)
-    bash.write_script(script, script_fn, job_done)
-
-
-def run_db2falcon(config, preads4falcon_fn, preads_db, job_done, script_fn):
-    script = bash.script_run_DB2Falcon(config, preads4falcon_fn, preads_db)
-    bash.write_script(script, script_fn, job_done)
-
-
-def run_falcon_asm(config, las_fofn_fn, preads4falcon_fasta_fn, db_file_fn, job_done, script_fn):
-    script = bash.script_run_falcon_asm(
-        config, las_fofn_fn, preads4falcon_fasta_fn, db_file_fn)
-    bash.write_script(script, script_fn, job_done)
-
-
-def run_report_pre_assembly(i_raw_reads_db_fn, i_preads_fofn_fn, genome_length, length_cutoff, o_json_fn, job_done, script_fn):
-    script = bash.script_run_report_pre_assembly(
-        i_raw_reads_db_fn, i_preads_fofn_fn, genome_length, length_cutoff, o_json_fn)
-    bash.write_script(script, script_fn, job_done)
-
-
-def run_daligner(daligner_script, db_prefix, config, job_done, script_fn):
-    bash.write_script(daligner_script, script_fn, job_done)
-
-
-def run_las_merge(script, job_done, config, script_fn):
-    bash.write_script(script, script_fn, job_done)
-
-
-def run_consensus(db_fn, las_fn, out_file_fn, config, job_done, script_fn):
-    script = bash.script_run_consensus(
-        config, db_fn, las_fn, os.path.basename(out_file_fn))
-    bash.write_script(script, script_fn, job_done)
