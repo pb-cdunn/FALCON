@@ -302,7 +302,7 @@ def process_get_consensus_result(res, args):
                 seq_i = 0
                 for cns_seq in cns:
                     if len(cns_seq) < 500:
-                        return
+                        continue
                     if seq_i >= 10:
                         break
                     print(">prolog/%s%01d/%d_%d" % (seed_id, seq_i, 0, len(cns_seq)))
