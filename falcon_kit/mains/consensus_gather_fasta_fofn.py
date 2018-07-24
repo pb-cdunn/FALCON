@@ -9,7 +9,7 @@ import argparse
 import logging
 import os
 import sys
-from .. import io
+from ..util import io
 
 LOG = logging.getLogger()
 
@@ -23,9 +23,13 @@ def run(gathered_fn, preads_fofn_fn):
         return os.path.join(d, fn)
     fasta_fns = list()
     for desc in gathered:
-        fasta_fns.append(abspath(desc['fasta']))
+        fn = abspath(desc['fasta'])
+        if 0 == io.filesize(fn):
+            LOG.warning('Skipping empty fasta {!r}'.format(fn))
+            continue
+        fasta_fns.append(fn)
     with open(preads_fofn_fn,  'w') as f:
-        for filename in sorted(fasta_fns):
+        for filename in sorted(fasta_fns, key=lambda fn: (os.path.basename(fn), fn)):
             print(filename, file=f)
 
 
