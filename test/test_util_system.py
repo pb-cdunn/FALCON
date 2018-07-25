@@ -2,7 +2,7 @@
 
 import falcon_kit.util.system as mod
 from falcon_kit.run_support import cd
-from falcon_kit.bash import mkdir
+from falcon_kit.io import mkdirs
 import helpers
 import pytest
 import os
@@ -11,12 +11,12 @@ import shutil
 
 def touchtree(*fns):
     for fn in fns:
-        mkdir(os.path.dirname(fn))
+        mkdirs(os.path.dirname(fn))
         with open(fn, 'w'):
             pass
 
 
-@pytest.yield_fixture
+#@pytest.yield_fixture
 @pytest.fixture(scope="session")
 def dirtree(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('mytmp')
