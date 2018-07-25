@@ -286,22 +286,21 @@ def run(args):
 
 good_region = re.compile("[ACGT]+")
 
-def process_get_consensus_result(res, args):
+def process_get_consensus_result(res, args, limit=500):
         cns, seed_id = res
-        if len(cns) < 500:
+        seed_id = int(seed_id)
+        if len(cns) < limit:
             return
 
         if args.output_full:
-            print(">" + seed_id + "_f")
+            print('>{:d}_f'.format(seed_id))
             print(cns)
         else:
             cns = good_region.findall(cns)
-            if len(cns) == 0:
-                return
             if args.output_multi:
                 seq_i = 0
                 for cns_seq in cns:
-                    if len(cns_seq) < 500:
+                    if len(cns_seq) < limit:
                         continue
                     if seq_i >= 10:
                         break
@@ -309,8 +308,10 @@ def process_get_consensus_result(res, args):
                     print(format_seq(cns_seq, 80))
                     seq_i += 1
             else:
+                if len(cns) == 0:
+                    return
                 cns.sort(key=lambda x: len(x))
-                print(">" + seed_id)
+                print('>{:d}'.format(seed_id))
                 print(cns[-1])
 
 def main(argv=sys.argv):
