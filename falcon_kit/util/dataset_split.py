@@ -21,7 +21,7 @@ def split_dataset(subreadset, out_prefix):
     """
     out_prefix_abs = os.path.abspath(out_prefix)
 
-    dset = SubreadSet(subreadset, strict=True)
+    dset = SubreadSet(subreadset, strict=True, skipCounts=True)
     fns = dset.toFofn()
 
     log.info('resources in {!r}:\n{}'.format(subreadset, '\n'.join(fns)))
@@ -29,7 +29,7 @@ def split_dataset(subreadset, out_prefix):
     fofn = []
     for i, bam_fn in enumerate(fns):
         out_fn = '{}.{:05}.subreadset.xml'.format(out_prefix_abs, i)
-        new_dataset = SubreadSet(bam_fn)
+        new_dataset = SubreadSet(bam_fn, skipCounts=True)
         new_dataset.newUuid()
         new_dataset._filters = copy.deepcopy(dset._filters)
         new_dataset.write(out_fn)
