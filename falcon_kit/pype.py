@@ -100,6 +100,8 @@ def gen_parallel_tasks(
     #inputs['SPLIT'] = split_fn # presumably ignored by script; might not be needed at all
     #split_fn = scatter_dict['outputs']['split'] # by convention
     wf.refreshTargets()
+    max_jobs = wf.max_jobs
+
     wait_for(split_fn)
     split = io.deserialize(split_fn)
     bash_template_fn = run_dict['bash_template_fn']
@@ -183,6 +185,9 @@ def gen_parallel_tasks(
         parameters={},
         dist=Dist(local=True),
     ))
+    wf.max_jobs = dist.job_dict.get('njobs', max_jobs)
+    wf.refreshTargets()
+    wf.max_jobs = max_jobs
 
 
 def dict_rel_paths(dict_paths):
