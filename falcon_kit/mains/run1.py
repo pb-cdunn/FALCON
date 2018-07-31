@@ -306,7 +306,6 @@ def run(wf, config, rule_writer,
             sys.exit(0)
 
         # Produce new FOFN of preads fasta, based on consensus of overlaps.
-        wf.max_jobs = config['job.step.cns'].get('njobs', default_njobs)
 
         split_fn = os.path.join(
             rawread_dir, 'cns-split', 'split.json')
@@ -353,6 +352,7 @@ def run(wf, config, rule_writer,
             ),
             dist=Dist(NPROC=6, job_dict=config['job.step.cns']),
         )
+
         preads_fofn_fn = os.path.join(rawread_dir, 'preads', 'input_preads.fofn')
         wf.addTask(gen_task(
             script=pype_tasks.TASK_CONSENSUS_GATHER_SCRIPT,
@@ -438,7 +438,6 @@ def run(wf, config, rule_writer,
     )
     ####
 
-    wf.max_jobs = config['job.step.asm'].get('njobs', default_njobs)
     db2falcon_dir = os.path.join(pread_dir, 'db2falcon')
     db2falcon_done_fn = os.path.join(db2falcon_dir, 'db2falcon_done')
     preads4falcon_fn = os.path.join(db2falcon_dir, 'preads4falcon.fasta')
@@ -494,11 +493,9 @@ def add_daligner_and_merge_tasks(
     Results:
       p_id2las_fn, las_fofn_fn
     """
-    max_jobs = wf.max_jobs
     parameters = dict()
 
     # run daligner
-    wf.max_jobs = daligner_job_config.get('njobs', default_njobs)
     daligner_all_units_fn = os.path.join(
         super_dir, 'daligner-split', 'all-units-of-work.json')
     daligner_bash_template_fn = os.path.join(
@@ -558,7 +555,6 @@ def add_daligner_and_merge_tasks(
     ))
 
     # Merge .las files.
-    wf.max_jobs = merge_job_config.get('njobs', default_njobs)
     las_merge_all_units_fn = os.path.join(super_dir, 'las-merge-split', 'all-units-of-work.json')
     bash_template_fn = os.path.join(super_dir, 'las-merge-split', 'las-merge-bash-template.sh')
     params = dict(parameters)
@@ -611,8 +607,6 @@ def add_daligner_and_merge_tasks(
         rule_writer=rule_writer,
         dist=Dist(local=True),
     ))
-
-    wf.max_jobs = max_jobs
 
 
 def add_rep_tasks(
