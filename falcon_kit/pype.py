@@ -84,13 +84,17 @@ def gen_parallel_tasks(
     #from future.utils import viewitems
     # run_dict['inputs'] should be patterns to match the inputs in split_fn, by convention.
 
+    #task_parameters = resolved_dict(run_dict.get('parameters', {}))
+    task_parameters = run_dict.get('parameters', {})
+    assert not task_parameters, 'We do not currently support the "parameters" field of a run_dict. {!r}'.format(task_parameters)
+
     # Write 3 wildcard rules for snakemake, 2 with dynamic.
     rule_writer.write_dynamic_rules(
             rule_name="foo",
             input_json=split_fn,
             inputs=dict_rel_paths(run_dict['inputs']),
             shell_template=run_dict['script'],
-            parameters=run_dict['parameters'],
+            parameters=task_parameters,
             wildcard_outputs=dict_rel_paths(run_dict['outputs']),
             output_json=gathered_fn,
     )
@@ -135,7 +139,6 @@ def gen_parallel_tasks(
             return result
         #task_inputs = resolved_dict(run_dict['inputs'])
         task_outputs = resolved_dict(run_dict['outputs'])
-        task_parameters = resolved_dict(run_dict['parameters'])
 
         wild_input = find_wildcard_input(run_dict['inputs'])
         one_uow_fn = os.path.abspath(wild_input.format(**wildcards))
@@ -160,8 +163,8 @@ def gen_parallel_tasks(
                     'units_of_work': one_uow_fn,
                     'bash_template': bash_template_fn,
                 },
-                outputs=task_outputs,
-                parameters=task_parameters,
+                outputs=task_outputs, # TASK_GENERIC_RUN_UNITS_SCRIPT expects only 1, called 'results'
+                parameters={}, # some are substituted from 'dist'
                 dist=dist,
         ))
         wildcards_str = '_'.join(w for w in itervalues(job['wildcards']))

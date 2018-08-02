@@ -165,6 +165,7 @@ def process_job_defaults(job_defaults):
     use_tmpdir = job_defaults.get(key, '')
     if '/' in use_tmpdir:
         tempfile.tempdir = use_tmpdir
+        os.environ['TMPDIR'] = use_tmpdir
     else:
         if use_tmpdir.lower().startswith('t'):
             use_tmpdir = tempfile.gettempdir()
