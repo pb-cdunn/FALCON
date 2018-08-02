@@ -1,6 +1,11 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+#import os
+#import random
+#random.seed(int(os.environ['PYTHONHASHSEED']))
+#import warnings
+#warnings.warn('PYTHONHASHSEED={}'.format(os.environ['PYTHONHASHSEED']))
 
 from future.utils import viewitems
 from future.utils import itervalues
@@ -10,6 +15,12 @@ import os
 import shlex
 import subprocess
 import sys
+
+# Makes chimer_nodes stable; maybe others.
+from ..util.ordered_set import OrderedSet as set
+
+# Not sure if adds to stability, but at least adds determinism.
+from collections import OrderedDict as dict
 
 DEBUG_LOG_LEVEL = 0
 
@@ -151,7 +162,7 @@ class StringGraph(object):
 
         chimer_nodes = []
         chimer_edges = set()
-        for n in chimer_candidates:
+        for n in chimer_candidates: # sort, or OrderedSet
             out_nodes = set([e.out_node for e in n.out_edges])
             test_set = set()
             for in_node in [e.in_node for e in n.in_edges]:
@@ -871,7 +882,7 @@ def generate_string_graph(args):
     out_f = open("sg_edges_list", "w")
     nxsg = nx.DiGraph()
     edge_data = {}
-    for v, w in sg.edges:
+    for v, w in sg.edges: # sort, or OrderedDict
         e = sg.edges[(v, w)]
         rid, sp, tp = e.attr["label"]
         score = e.attr["score"]
