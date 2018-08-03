@@ -242,7 +242,7 @@ def symlink(jo):
     def task_build_pdb():
         """
         """
-        rdir = abstdir('falcon_ns2.tasks.task_falcon1_build_pdb-0')
+        rdir = abstdir('falcon_ns2.tasks.task_falcon1_dazzler_build_p-0')
         with mkcd('1-preads_ovl/build/'):
             #touch('pdb_build_done', 'run_jobs.sh', 'preads.db')
             link(rdir, 'preads.db')
@@ -267,10 +267,9 @@ def symlink(jo):
             touch_done()
 
     def task_daligner_combine1():
-        rdir = abstdir('falcon_ns2.tasks.task_falcon1_run_daligner_find_las-0')
+        rdir = abstdir('falcon_ns2.tasks.task_falcon1_dazzler_daligner_combine-0')
         with mkcd('1-preads_ovl/daligner-combine/'):
-            #link(rdir, 'las_paths.json', 'gathered-las.json')
-            link(rdir, 'gathered-las.json', 'gathered-las.json')
+            link(rdir, 'las_paths.json', 'gathered-las.json')
             touch_done()
 
     def task_lamerge_split1():
@@ -289,12 +288,11 @@ def symlink(jo):
 
     def task_lamerge_combine1():
         rdir = abstdir(
-            'falcon_ns2.tasks.task_falcon1_run_las_merge_post_gather-0')
-        #    'falcon_ns2.tasks.task_falcon1_dazzler_lamerge_combine-0')
+            'falcon_ns2.tasks.task_falcon1_dazzler_lamerge_combine-0')
         with mkcd('1-preads_ovl/las-merge-combine/'):
-            link(rdir, 'las-fofn.json', 'las_fofn.json') # unzip/quiver, for now
-            link(rdir, 'las-fofn.json', 'las_paths.json')
-            link(rdir, 'p_id2las.json', 'block2las.json')
+            link(rdir, 'las_paths.json', 'las_fofn.json') # unzip/quiver, for now
+            link(rdir, 'las_paths.json', 'las_paths.json')
+            link(rdir, 'block2las.json', 'block2las.json')
             touch_done()
 
     def task_run_db2falcon():
@@ -356,7 +354,8 @@ def symlink(jo):
             p('length_cutoff = {}'.format(length_cutoff))
             p('[Unzip]')
             p('input_fofn = {}'.format(input_fofn))
-            p('input_bam_fofn = {} # You need to find this!'.format('input_bam.fofn'))
+            p('# You need to find this!')
+            p('input_bam_fofn = {}'.format('input_bam.fofn'))
             p('[job.defaults]')
             p('pwatcher_type = blocking')
             #p('submit = /bin/bash -c "${JOB_SCRIPT}"')
