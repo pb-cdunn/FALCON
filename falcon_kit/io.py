@@ -74,6 +74,12 @@ def FilePercenter(fn, log=LOG.info):
         size = sys.maxint
     else:
         size = filesize(fn)
+        if fn.endswith('.dexta'):
+            size = size * 4
+        elif fn.endswith('.gz'):
+            size = sys.maxint # probably 2.8x to 3.2x, but we are not sure, and higher is better than lower
+            # https://stackoverflow.com/a/22348071
+            # https://jira.pacificbiosciences.com/browse/TAG-2836
     return Percenter(fn, size, log, units='bytes')
 
 @contextlib.contextmanager
