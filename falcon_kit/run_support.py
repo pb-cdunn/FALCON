@@ -361,7 +361,7 @@ def update_defaults(cfg):
     set_default('pa_DBsplit_option', '-x500 -s200 -a')
     set_default('skip_checks', False)
     set_default('pa_DBdust_option', '') # Gene recommends the defaults. I have tried -w128 -t2.5 -m20
-    set_default('pa_fasta_filter_option', 'streamed-median')
+    set_default('pa_fasta_filter_option', 'streamed-internal-median')
     set_default('dazcon', False)
     set_default('pa_dazcon_option', '-j 4 -x -l 500')
     set_default('ovlp_DBsplit_option', '-x500 -s200 -a')
