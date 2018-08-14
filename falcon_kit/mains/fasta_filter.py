@@ -74,7 +74,7 @@ def yield_zmwtuples(records):
 def run_streamed_median(fp_in, fp_out, fn='-', zmw_filter_func=median_zmw_subread):
     fasta_records = FastaReader.yield_fasta_records(fp_in, fn, log=LOG.info)
     for zmw_id, zmw_subreads in itertools.groupby(yield_zmwtuples(fasta_records), lambda x: x.zmw_id):
-        median_zrec = median_zmw_subread(list(zmw_subreads))
+        median_zrec = zmw_filter_func(list(zmw_subreads))
         fp_out.write(str(median_zrec.subread_record))
         fp_out.write('\n')
 
