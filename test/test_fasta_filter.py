@@ -1,4 +1,5 @@
 import falcon_kit.mains.fasta_filter as mod
+import functools
 import helpers
 import pytest
 import os
@@ -255,6 +256,16 @@ def test_run_streamed_median_4():
 def test_run_streamed_median_5():
     check_run_raises(mod.run_streamed_median, fasta_tests[5], '-')
 
+def test_run_streamed_median_7g():
+    # test general
+    curried = functools.partial(mod.run_streamed_median, zmw_filter_func=mod.median_zmw_subread)
+    check_run(curried, fasta_tests[7], expected_general_median_tests[7], '-')
+
+def test_run_streamed_median_7i():
+    # test internal
+    curried = functools.partial(mod.run_streamed_median, zmw_filter_func=mod.internal_median_zmw_subread)
+    check_run(curried, fasta_tests[7], expected_internal_median_tests[7], '-')
+
 #######################################
 ### Test the general median filter. ###
 #######################################
@@ -294,7 +305,7 @@ def test_run_median_filter_6(tmpdir):
     in_fa_file.write(fasta)
     check_run(mod.run_median_filter, fasta_tests[6], expected_tests[6], str(in_fa_file))
 
-def test_run_median_filter_7(tmpdir):
+def test_run_median_filter_5x(tmpdir):
     """
     The run_median_filter asserts if the input file doesn't exist.
     This is to prevent specifying streams we can't rewind.
