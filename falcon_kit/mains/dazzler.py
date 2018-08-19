@@ -827,8 +827,9 @@ def merge_apply(las_paths_fn, las_fn):
             next_paths.append(tmp_las)
         curr_paths = next_paths
 
+    # Save only the one we want.
     io.syscall('mv -f {} {}'.format(curr_paths[0], 'keep-this'))
-    io.syscall('#rm -f *.las')
+    io.syscall('rm -f *.las')
     io.syscall('mv -f {} {}'.format('keep-this', las_fn))
 
 def merge_combine(gathered_fn, las_paths_fn, block2las_fn):
