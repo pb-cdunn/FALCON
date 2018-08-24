@@ -282,12 +282,12 @@ def test_args_from_line():
 
 
 def test_parse_REPmask_code(caplog):
-    code = '1,111;2,222;2,333'
+    code = '1,111/2,222/2,333'
     with pytest.raises(Exception) as excinfo:
         f.parse_REPmask_code(code)
     assert 'group sizes must not match' in str(excinfo.value)
 
-    code = '2,111;3,222;1,333'
+    code = '2,111/3,222/1,333'
     with pytest.raises(Exception) as excinfo:
         f.parse_REPmask_code(code)
     assert 'group sizes must increase monotonically' in str(excinfo.value)
@@ -299,9 +299,13 @@ def test_parse_REPmask_code(caplog):
         got = f.parse_REPmask_code(code)
     assert got == expected
 
-    code = '1,111;2,222;3,333'
+    code = '1,111/2,222/3,333'
     assert f.parse_REPmask_code(code) == [(1,111), (2,222), (3,333)]
 
+    code = '1,300/0,300/0,300'
+    assert f.parse_REPmask_code(code) == [(1,300), (0,300), (0,300)]
+
+    # Check backward-compatibility
     code = '1,300;0,300;0,300'
     assert f.parse_REPmask_code(code) == [(1,300), (0,300), (0,300)]
 

@@ -518,13 +518,17 @@ def parse_REPmask_code(code):
     group_size==0 indicates "no-op".
     Otherwise, super-high coverage_limit indicates "do work, but produce empty mask-track".
 
-    >>> parse_REPmask_code('1,10;2,20;3,300')
+    >>> parse_REPmask_code('1,10/2,20/3,300')
     [(1, 10), (2, 20), (3, 300)]
     """
     ec = 0 # arbitrary
     result = [(0, ec), (0, ec), (0, ec)] # all no-op by default
     try:
-        pairs = code.split(';')
+        if '/' in code:
+            pairs = code.split('/')
+        else:
+            assert ';' in code, 'code contains neither ";" nor "/": {!r}'.format(code)
+            pairs = code.split(';')
         assert len(pairs) <= 3
         for i, p in enumerate(pairs):
             g, c = map(int, p.split(','))
