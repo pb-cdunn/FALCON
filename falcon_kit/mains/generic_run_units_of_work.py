@@ -42,9 +42,11 @@ def run(bash_template_fn, units_of_work_fn, nproc,
     uow_dirs = list()
     results = list()
     for i, uow in enumerate(uows):
+        uow_dir = 'uow-{:02d}'.format(i)
+        rel_units_of_work_dn = os.path.normpath(os.path.relpath(os.path.dirname(units_of_work_fn), uow_dir))
         job = uow
         inputs = job['input']
-        update_values_rel_to(inputs, os.path.normpath(os.path.dirname(units_of_work_fn)))
+        update_values_rel_to(inputs, rel_units_of_work_dn)
         outputs = job['output'] # assumed to be relative to run-dir
         params = dict(job['params'])
         params['pypeflow_nproc'] = nproc
@@ -55,7 +57,6 @@ def run(bash_template_fn, units_of_work_fn, nproc,
         LOG.info('INPUT:{}'.format(inputs))
         LOG.info('OUTPUT:{}'.format(outputs))
         LOG.info('PARAMS:{}'.format(params))
-        uow_dir = 'uow-{:02d}'.format(i)
         uow_dirs.append(uow_dir)
         io.rmdir(uow_dir)
         io.mkdirs(uow_dir)

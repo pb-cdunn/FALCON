@@ -1,3 +1,7 @@
+"""
+This must not run in a tmpdir. The 'inputs' paths will
+end up relative to the rundir.
+"""
 from __future__ import absolute_import
 
 import argparse
@@ -30,13 +34,15 @@ def validate(bash_template, inputs, outputs, parameterss):
 
 def run(all_uow_list_fn, split_idx, one_uow_list_fn):
     all_uows = io.deserialize(all_uow_list_fn)
-    dn = os.path.abspath(os.path.dirname(all_uow_list_fn))
+    all_dn = os.path.abspath(os.path.dirname(all_uow_list_fn))
+    one_dn = os.path.abspath(os.path.dirname(one_uow_list_fn))
+    rel_dn = os.path.relpath(all_dn, one_dn)
     one_uow = all_uows[split_idx]
 
     def fixpath(rel):
         try:
             if rel.startswith('./'):
-                return os.path.join(dn, rel)
+                return os.path.join('.', os.path.normpath(os.path.join(rel_dn, rel)))
         except Exception:
             pass
         return rel
