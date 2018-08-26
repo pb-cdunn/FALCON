@@ -14,13 +14,14 @@ def run(result_fn_list_fn, gathered_fn):
     thisdir = os.path.dirname(gathered_fn)
     result_fn_list = io.deserialize(result_fn_list_fn)
     io.serialize(gathered_fn, result_fn_list)
+    gathered_dn = os.path.dirname(gathered_fn)
     gathered = list()
     for result_fn in result_fn_list:
         some_results = io.deserialize(result_fn)
         d = os.path.abspath(os.path.dirname(result_fn))
         def abspath(v):
             if v.startswith('.'):
-                return os.path.normpath(os.path.join(d, v))
+                return os.path.normpath(os.path.relpath(os.path.join(d, v), gathered_dn))
             else:
                 return v # apparently not a path
         # By construction, this is a list of dicts of k:output,

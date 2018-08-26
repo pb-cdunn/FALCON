@@ -169,12 +169,14 @@ def gen_parallel_tasks(
         ))
         wildcards_str = '_'.join(w for w in itervalues(job['wildcards']))
         job_name = 'job{}'.format(wildcards_str)
-        task_results[job_name] = os.path.abspath(task_outputs.values()[0])
+        task_results[job_name] = task_outputs.values()[0]
 
     gather_inputs = dict(task_results)
     ## An implicit "gatherer" simply takes the output filenames and combines their contents.
-    result_fn_list_fn = os.path.join(os.path.dirname(gathered_fn), 'result-fn-list.json')
-    io.serialize(result_fn_list_fn, list(task_results.values())) # dump into next task-dir before next task starts
+    gathered_dn = os.path.dirname(gathered_fn)
+    result_fn_list_fn = os.path.join(gathered_dn, 'result-fn-list.json')
+    # Dump (with rel-paths) into next task-dir before next task starts.
+    io.serialize(result_fn_list_fn, [os.path.relpath(v, gathered_dn) for v in task_results.values()])
     #assert 'result_fn_list' not in gather_inputs
     #gather_inputs['result_fn_list'] = result_fn_list_fn # No! pseudo output, since it must exist in a known directory
     LOG.debug('gather_inputs:{!r}'.format(gather_inputs))
