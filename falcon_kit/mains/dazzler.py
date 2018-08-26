@@ -276,10 +276,12 @@ def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
         blocks = get_blocks(line)
         assert blocks, 'No blocks found in {!r} from {!r}'.format(line, 'tan-jobs.01.OVL')
         las_files = ' '.join('TAN.{db}{block}.las'.format(db=db, block=block) for block in blocks)
+        # We assume the actual DB will be symlinked here.
+        base_db = os.path.basename(db)
         script_lines = [
             line,
-            'LAcheck {} {}\n'.format(db, las_files),
-            'TANmask {} {}\n'.format(db, las_files),
+            'LAcheck {} {}\n'.format(base_db, las_files),
+            'TANmask {} {}\n'.format(base_db, las_files),
             'rm -f {}\n'.format(las_files),
         ]
         if [''] == blocks:
@@ -372,10 +374,12 @@ def rep_split(config, config_fn, db_fn, las_paths_fn, wildcards, group_size, cov
     scripts = list()
     for i, las_fn in enumerate(las_paths):
         las_files = las_fn # one at-a-time
+        # We assume the actual DB will be symlinked here.
+        base_db = os.path.basename(db)
         script_lines = [
             #'LAcheck {} {}\n'.format(db, las_files),
             'REPmask -v -c{} -nrep{} {} {}\n'.format(
-                coverage_limit, group_size, db, las_files),
+                coverage_limit, group_size, base_db, las_files),
             'rm -f {}\n'.format(las_files),
         ]
         scripts.append(''.join(script_lines))
@@ -558,9 +562,9 @@ def rep_daligner_split(config, config_fn, db_fn, nproc, wildcards, group_size, c
         stream.write(pype_tasks.TASK_DB_DALIGNER_APPLY_SCRIPT)
 
     if group_size == 0:
-        scripts = _get_rep_daligner_split_noop_scripts(db_fn)
+        scripts = _get_rep_daligner_split_noop_scripts(os.path.basename(db_fn))
     else:
-        scripts = _get_rep_daligner_split_scripts(config, db_fn, group_size, coverage_limit)
+        scripts = _get_rep_daligner_split_scripts(config, os.path.basename(db_fn), group_size, coverage_limit)
 
     jobs = list()
     for i, script in enumerate(scripts):
@@ -597,13 +601,16 @@ def get_tracks(db_fn):
 def daligner_split(config, config_fn, db_fn, nproc, wildcards, length_cutoff_fn, split_fn, bash_template_fn):
     with open(bash_template_fn, 'w') as stream:
         stream.write(pype_tasks.TASK_DB_DALIGNER_APPLY_SCRIPT)
+    symlink_db(db_fn)
     db = os.path.splitext(db_fn)[0]
     dbname = os.path.basename(db)
 
     tracks = get_tracks(db_fn)
 
+    # We assume the actual DB will be symlinked here.
+    base_db = os.path.basename(db)
     script = ''.join([
-        script_HPC_daligner(config, db, length_cutoff_fn, tracks, prefix='daligner-jobs'),
+        script_HPC_daligner(config, base_db, length_cutoff_fn, tracks, prefix='daligner-jobs'),
     ])
     script_fn = 'split_db.sh'
     with open(script_fn, 'w') as ofs:
@@ -649,7 +656,7 @@ def daligner_split(config, config_fn, db_fn, nproc, wildcards, length_cutoff_fn,
             scripts = [new_script]
 
     for i, script in enumerate(scripts):
-        LAcheck = 'LAcheck -vS {} *.las'.format(db)
+        LAcheck = 'LAcheck -vS {} *.las'.format(base_db)
         script += '\n' + LAcheck + '\n'
         scripts[i] = script
 
@@ -679,6 +686,7 @@ def daligner_split(config, config_fn, db_fn, nproc, wildcards, length_cutoff_fn,
 
 def daligner_apply(db_fn, script_fn, job_done_fn):
     symlink(script_fn)
+    symlink_db(db_fn)
     io.syscall('bash -vex {}'.format(os.path.basename(script_fn)))
     io.touch(job_done_fn)
 
