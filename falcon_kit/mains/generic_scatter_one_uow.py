@@ -41,9 +41,10 @@ def run(all_uow_list_fn, split_idx, one_uow_list_fn):
 
     def fixpath(rel):
         try:
-            if rel.startswith('./'):
+            if not os.path.isabs(rel):
                 return os.path.join('.', os.path.normpath(os.path.join(rel_dn, rel)))
         except Exception:
+            # in case of non-string?
             pass
         return rel
     if isinstance(one_uow, dict):
