@@ -154,7 +154,7 @@ def gen_parallel_tasks(
                 parameters={
                     'split_idx': split_idx,
                 },
-                dist=Dist(local=True),
+                dist=Dist(local=True, use_tmpdir=False),
         ))
 
         wf.addTask(pype_gen_task(
@@ -186,7 +186,7 @@ def gen_parallel_tasks(
             'result_fn_list': result_fn_list_fn,
         },
         parameters={},
-        dist=Dist(local=True),
+        dist=Dist(local=True, use_tmpdir=False),
     ))
     wf.max_jobs = dist.job_dict.get('njobs', max_jobs)
     wf.refreshTargets()
