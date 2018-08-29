@@ -561,6 +561,7 @@ def rep_daligner_split(config, config_fn, db_fn, nproc, wildcards, group_size, c
     with open(bash_template_fn, 'w') as stream:
         stream.write(pype_tasks.TASK_DB_DALIGNER_APPLY_SCRIPT)
 
+    symlink_db(db_fn)
     if group_size == 0:
         scripts = _get_rep_daligner_split_noop_scripts(os.path.basename(db_fn))
     else:
