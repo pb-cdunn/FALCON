@@ -8,6 +8,7 @@ import re
 import sys
 from .. import io
 from .. import bash
+from .dazzler import symlink_db
 
 LOG = logging.getLogger()
 
@@ -65,11 +66,30 @@ def get_pa_dazcon_option(opt, nproc):
     opt += ' -j {}'.format(nproc)
     return opt
 
+def symlink(actual):
+    """Symlink into cwd, without relativizing.
+    """
+    symbolic = os.path.basename(actual)
+    if os.path.abspath(actual) == os.path.abspath(symbolic):
+        LOG.warning('Cannot symlink {!r} as {!r}, itself.'.format(actual, symbolic))
+        return
+    rel = actual # not really relative, but this code was copy/pasted
+    if True:
+        LOG.info('ln -sf {} {}'.format(rel, symbolic))
+        if os.path.lexists(symbolic):
+            if os.readlink(symbolic) == rel:
+                return
+            else:
+                os.unlink(symbolic)
+    os.symlink(rel, symbolic)
 
 # This function was copied from bash.py and modified.
 def script_run_consensus(config, db_fn, las_fn, out_file_fn, nproc):
     """config: dazcon, falcon_sense_greedy, falcon_sense_skip_contained, LA4Falcon_preload
     """
+    symlink_db(db_fn, symlink=symlink)
+    db_fn = os.path.basename(db_fn)
+    assert os.path.exists(db_fn), os.path.abspath(db_fn)
     io.rm(out_file_fn) # in case of resume
     out_file_bfn = out_file_fn + '.tmp'
     params = dict(config)
@@ -110,6 +130,14 @@ def run(config_fn, length_cutoff_fn, las_fn, db_fn, nproc,
     length_cutoff = int(open(length_cutoff_fn).read())
     config = io.deserialize(config_fn)
     config['length_cutoff'] = length_cutoff
+    dbdir = config.get('LA4Falcon_dbdir')
+    if dbdir:
+        # Assume we are 2 levels deeper than consensus_split was.
+        parent3 = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(os.getcwd()))))
+        dbdir = os.path.join(config['LA4Falcon_dbdir'], 'fc-db') + parent3
+        bn = os.path.basename(db_fn)
+        LOG.warning('Using symlinks to {} in LA4Falcon_dbdir={!r}'.format(bn, dbdir))
+        db_fn = os.path.join(dbdir, bn)
     script = script_run_consensus(
         config, db_fn, las_fn,
         os.path.basename(fasta_fn), # not sure basename is really needed here
