@@ -462,6 +462,9 @@ def check_unexpected_keys(cfg):
         'falcon_sense_skip_contained',
         'falcon_sense_greedy',
         'LA4Falcon_preload',
+        'LA4Falcon_pre', # hidden
+        'LA4Falcon_post', # hidden
+        'LA4Falcon_dbdir', # hidden
         'overlap_filtering_setting',
         'fc_ovlp_to_graph_option',
         'bestn',
