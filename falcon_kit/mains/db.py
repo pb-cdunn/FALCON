@@ -66,4 +66,5 @@ def main(prog, subcmd, db, dbdir):
     func = cmd2func[subcmd]
     func(db, dbdir)
 
-main(*sys.argv)
+if __name__ == "__main__":
+    main(*sys.argv)  # pylint: disable=no-value-for-parameter
