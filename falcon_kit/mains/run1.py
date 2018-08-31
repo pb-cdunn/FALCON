@@ -358,6 +358,8 @@ def run(wf, config, rule_writer,
             script=pype_tasks.TASK_CONSENSUS_GATHER_SCRIPT,
             inputs={
                 'gathered': gathered_fn,
+                'config': general_config_fn,
+                'raw_reads_db': r_db_rep_fn,
             },
             outputs={
                 'preads_fofn': preads_fofn_fn,
