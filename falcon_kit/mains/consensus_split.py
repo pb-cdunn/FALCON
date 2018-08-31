@@ -6,7 +6,6 @@ import argparse
 import collections
 import logging
 import os
-import string
 import sys
 from .. import io
 from .. import bash
@@ -34,18 +33,6 @@ def read_gathered_las(path):
     #   path, pprint.pformat(result)))
     return result
 
-def pre_hook(config_fn, db_fn):
-    config = io.deserialize(config_fn)
-    hook = config.get('LA4Falcon_pre')
-    if hook:
-        LOG.warning('Found LA4Falcon_pre in General section of cfg. About to run {!r}...'.format(hook))
-        if config.get('LA4Falcon_preload'):
-            LOG.error('Found both LA4Falcon_pre and LA4Falcon_preload. Why would you preload after you have copied the DB? I hope you know what you are doing.')
-        db = os.path.abspath(db_fn)
-        parent = os.path.abspath(os.path.dirname(os.getcwd()))
-        dbdir = os.path.join(config['LA4Falcon_dbdir'], 'fc-db') + parent
-        cmd = string.Template(hook).substitute(DB=db, DBDIR=dbdir)
-        io.syscall(cmd)
 
 def run(p_id2las_fn, db_fn, length_cutoff_fn, config_fn, wildcards,
         bash_template_fn, split_fn):
@@ -98,7 +85,6 @@ def run(p_id2las_fn, db_fn, length_cutoff_fn, config_fn, wildcards,
         jobs.append(job)
 
     io.serialize(split_fn, jobs)
-    pre_hook(config_fn, db_fn)
 
 
 class HelpF(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
