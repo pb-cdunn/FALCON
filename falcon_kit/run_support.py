@@ -404,7 +404,7 @@ def update_defaults(cfg):
     fc_ovlp_to_graph_option = cfg['fc_ovlp_to_graph_option']
     if '--min_len' not in fc_ovlp_to_graph_option and '--min-len' not in fc_ovlp_to_graph_option:
         length_cutoff_pr = cfg['length_cutoff_pr']
-        fc_ovlp_to_graph_option += ' --min_len {}'.format(length_cutoff_pr)
+        fc_ovlp_to_graph_option += ' --min-len {}'.format(length_cutoff_pr)
         cfg['fc_ovlp_to_graph_option'] = fc_ovlp_to_graph_option
 
     target = cfg['target']
