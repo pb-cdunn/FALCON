@@ -218,7 +218,7 @@ def symlink(actual, symbolic=None, force=True):
                 return
     os.symlink(rel, symbolic)
 
-def symlink_db(db_fn):
+def symlink_db(db_fn, symlink=symlink):
     """Symlink everything that could be related to this Dazzler DB.
     Exact matches will probably cause an exception in symlink().
     """
