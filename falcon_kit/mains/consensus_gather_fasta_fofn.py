@@ -15,7 +15,12 @@ from ..util import io
 LOG = logging.getLogger()
 
 
-def post_hook(config_fn, db_fn):
+def post_hook(config_fn, db_fn, gathered_fn):
+    # gathered_fn is needed only for this hacky bypass, for pbsmrtpipe.
+    if os.path.samefile(gathered_fn, db_fn):
+        return
+    if os.path.samefile(gathered_fn, config_fn):
+        return
     config = io.deserialize(config_fn)
     hook = config.get('LA4Falcon_post')
     if hook:
@@ -43,7 +48,7 @@ def run(gathered_fn, db_fn, config_fn, preads_fofn_fn):
     with open(preads_fofn_fn,  'w') as f:
         for filename in sorted(fasta_fns, key=lambda fn: (os.path.basename(fn), fn)):
             print(filename, file=f)
-    post_hook(config_fn, db_fn)
+    post_hook(config_fn, db_fn, gathered_fn)
 
 
 class HelpF(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
