@@ -356,7 +356,7 @@ def update_defaults(cfg):
     set_default('pa_HPCdaligner_option', '-v -D24')
     set_default('ovlp_HPCdaligner_option', '-v -D24 -l500')
     set_default('pa_HPCTANmask_option', '-l500') # daligner defaults to -l1000
-    set_default('ovlp_HPCTANmask_option', '-l500')
+    #set_default('ovlp_HPCTANmask_option', '-l500')
     set_default('pa_REPmask_code', '0,300/0,300/0,300')
     set_default('pa_DBsplit_option', '-x500 -s200 -a')
     set_default('skip_checks', False)
