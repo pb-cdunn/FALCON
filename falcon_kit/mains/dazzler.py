@@ -154,7 +154,7 @@ rm -f daligner-jobs.*
 echo "SMRT_PYTHON_PATH_PREPEND=$SMRT_PYTHON_PATH_PREPEND"
 echo "PATH=$PATH"
 which HPC.daligner
-HPC.daligner -P. {daligner_opt} {masks} -H$CUTOFF -f{prefix} {db} >| run_jobs.sh
+HPC.daligner -P. {daligner_opt} {masks} -H$CUTOFF -f{prefix} {db}
     """.format(**params)
 
 def script_HPC_TANmask(config, db, prefix):
