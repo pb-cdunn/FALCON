@@ -85,7 +85,7 @@ def script_build_db(config, input_fofn_fn, db):
     except Exception:
         LOG.exception('Using "cat" by default.')
         cat_fasta = 'cat '
-    DBdust = 'DBdust {} {}'.format(config.get('pa_DBdust_option', ''), db)
+    DBdust = 'DBdust {} {}'.format(config.get('DBdust_opt', ''), db)
     fasta_filter_option = config.get('fasta_filter_option', 'pass')
     params.update(locals())
     script = """\
@@ -1005,6 +1005,7 @@ def get_ours(config_fn, db_fn):
         ours['user_length_cutoff'] = int(config.get('length_cutoff_pr', '0'))
         ours['fasta_filter_option'] = 'pass'
     else:
+        ours['DBdust_opt'] = config.get('pa_DBdust_option', '')
         ours['DBsplit_opt'] = config.get('pa_DBsplit_option', '')
         ours['daligner_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCdaligner_option', '')
         ours['TANmask_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCTANmask_option', '')
