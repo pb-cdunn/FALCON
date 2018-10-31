@@ -60,7 +60,7 @@ def bam2dexta_apply(bam_fn, dexta_fn):
     """
     io.rm_force(dexta_fn)
     tmpdir = '.' # There is no significant improvement to runnning on local disk.
-    cmd = 'rm -f {dexta_fn}; ls -larth {tmpdir}; (bam2fasta -u -o - {bam_fn} | dexta -i >| {tmpdir}/foo.dexta); time mv -f {tmpdir}/foo.dexta {dexta_fn}'.format(
+    cmd = 'rm -f {dexta_fn}; ls -larth {tmpdir}; (bam2fasta -u -o - {bam_fn} | dexta -i >| {tmpdir}/foo.dexta); mv -f {tmpdir}/foo.dexta {dexta_fn}'.format(
         **locals())
     # Note: If 'dexta' fails, the script will error. So we might still have an empty foo.dexta, but
     # we will not have moved it to {dexta_fn}.
