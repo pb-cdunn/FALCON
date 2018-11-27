@@ -20,6 +20,14 @@ def tokenize_header(seq_header):
     subread_start, subread_end = [int(val) for val in subread_pos.split('_')]
     return movie_name, zmw_id, subread_start, subread_end
 
+def longest_zmw_subread(zmw_subreads):
+    """Return subread_record with longest seq_len.
+    zmw_subreads is a list of ZMWTuple.
+    """
+    assert len(zmw_subreads) != 0
+
+    return max(zmw_subreads, key = lambda x: x.seq_len)
+
 def median_zmw_subread(zmw_subreads):
     """Return subread_record with median seq_len.
     zmw_subreads is a list of ZMWTuple.
@@ -80,6 +88,12 @@ def run_streamed_filter(fp_in, fp_out, fn, zmw_filter_func):
 
 def run_streamed_median_filter(fp_in, fp_out, fn='-', zmw_filter_func=median_zmw_subread):
     run_streamed_filter(fp_in, fp_out, fn, zmw_filter_func)
+
+##############################
+### Longest filter.
+##############################
+def run_streamed_longest_filter(fp_in, fp_out, fn):
+    run_streamed_filter(fp_in, fp_out, fn, zmw_filter_func=longest_zmw_subread)
 
 ##############################
 ### Pass filter.           ###
@@ -158,6 +172,10 @@ def cmd_run_pass_filter(args):
     with open_stream(args.input_path) as fp_in:
         run_pass_filter(fp_in, sys.stdout, args.input_path)
 
+def cmd_run_streamed_longest_filter(args):
+    with open_stream(args.input_path) as fp_in:
+        run_streamed_longest_filter(fp_in, sys.stdout, args.input_path)
+
 def cmd_run_streamed_median_filter(args):
     with open_stream(args.input_path) as fp_in:
         run_streamed_median_filter(fp_in, sys.stdout, args.input_path)
@@ -188,6 +206,7 @@ def parse_args(argv):
     subparsers = parser.add_subparsers(help='sub-command help')
 
     help_pass = 'The no-op filter - passes every FASTA record to stdout. If input_path is "-", input is read from stdin.'
+    help_streamed_longest = 'Selects the longest read in each ZMW by running a single-pass over the data (i.e. "streamed"). The input subreads should be groupped by ZMW. If input_path is "-", input is read from stdin.'
     help_median = 'Applies the median-length ZMW filter by running two passes over the data. Only one subread per ZMW is output, based on median-length selection. The input_path needs to be a file.'
     help_streamed_median = 'Applies the median-length ZMW filter by running a single-pass over the data. The input subreads should be groupped by ZMW. If input_path is "-", input is read from stdin.'
     help_internal_median = 'Applies the median-length ZMW filter only on internal subreads (ZMWs with >= 3 subreads) by running two passes over the data. For ZMWs with < 3 subreads, the maximum-length one is selected. The input_path needs to be a file.'
@@ -198,6 +217,12 @@ def parse_args(argv):
             description=help_pass,
             help=help_pass)
     parser_pass.set_defaults(func=cmd_run_pass_filter)
+
+    parser_pass = subparsers.add_parser('streamed-longest',
+            formatter_class=HelpF,
+            description=help_streamed_longest,
+            help=help_streamed_longest)
+    parser_pass.set_defaults(func=cmd_run_streamed_longest_filter)
 
     parser_median = subparsers.add_parser('median',
             formatter_class=HelpF,
