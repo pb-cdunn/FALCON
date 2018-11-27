@@ -242,28 +242,28 @@ def test_run_pass_filter_5():
 ### Test the streamed median filter. ###
 ########################################
 def test_run_streamed_median_1():
-    check_run(mod.run_streamed_median, fasta_tests[1], expected_tests[1], '-')
+    check_run(mod.run_streamed_median_filter, fasta_tests[1], expected_tests[1], '-')
 
 def test_run_streamed_median_2():
-    check_run(mod.run_streamed_median, fasta_tests[2], expected_tests[2], '-')
+    check_run(mod.run_streamed_median_filter, fasta_tests[2], expected_tests[2], '-')
 
 def test_run_streamed_median_3():
-    check_run(mod.run_streamed_median, fasta_tests[3], expected_tests[3], '-')
+    check_run(mod.run_streamed_median_filter, fasta_tests[3], expected_tests[3], '-')
 
 def test_run_streamed_median_4():
-    check_run(mod.run_streamed_median, fasta_tests[4], expected_tests[4], '-')
+    check_run(mod.run_streamed_median_filter, fasta_tests[4], expected_tests[4], '-')
 
 def test_run_streamed_median_5():
-    check_run_raises(mod.run_streamed_median, fasta_tests[5], '-')
+    check_run_raises(mod.run_streamed_median_filter, fasta_tests[5], '-')
 
 def test_run_streamed_median_7g():
     # test general
-    curried = functools.partial(mod.run_streamed_median, zmw_filter_func=mod.median_zmw_subread)
+    curried = functools.partial(mod.run_streamed_median_filter, zmw_filter_func=mod.median_zmw_subread)
     check_run(curried, fasta_tests[7], expected_general_median_tests[7], '-')
 
 def test_run_streamed_median_7i():
     # test internal
-    curried = functools.partial(mod.run_streamed_median, zmw_filter_func=mod.internal_median_zmw_subread)
+    curried = functools.partial(mod.run_streamed_median_filter, zmw_filter_func=mod.internal_median_zmw_subread)
     check_run(curried, fasta_tests[7], expected_internal_median_tests[7], '-')
 
 #######################################
@@ -402,4 +402,3 @@ def test_main_cmd_streamed_internal_median_1(tmpdir, capsys):
 def test_main_cmd_streamed_internal_median_2(tmpdir, capsys):
     in_fa_file = tmpdir.join('in.fa')
     check_main_from_file('streamed-internal-median', fasta_tests[4], expected_tests[4], in_fa_file, capsys)
-

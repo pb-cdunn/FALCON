@@ -71,12 +71,15 @@ def yield_zmwtuples(records):
                         subread_header=record.name, subread_id=0)
         yield zrec
 
-def run_streamed_median(fp_in, fp_out, fn='-', zmw_filter_func=median_zmw_subread):
+def run_streamed_filter(fp_in, fp_out, fn, zmw_filter_func):
     fasta_records = FastaReader.yield_fasta_records(fp_in, fn, log=LOG.info)
     for zmw_id, zmw_subreads in itertools.groupby(yield_zmwtuples(fasta_records), lambda x: x.zmw_id):
-        median_zrec = zmw_filter_func(list(zmw_subreads))
-        fp_out.write(str(median_zrec.subread_record))
+        zrec = zmw_filter_func(list(zmw_subreads))
+        fp_out.write(str(zrec.subread_record))
         fp_out.write('\n')
+
+def run_streamed_median_filter(fp_in, fp_out, fn='-', zmw_filter_func=median_zmw_subread):
+    run_streamed_filter(fp_in, fp_out, fn, zmw_filter_func)
 
 ##############################
 ### Pass filter.           ###
@@ -138,7 +141,7 @@ def run_internal_median_filter(fp_in, fp_out, fn):
 ### Streamed internal median filter ###
 #######################################
 def run_streamed_internal_median_filter(fp_in, fp_out, fn='-'):
-    run_streamed_median(fp_in, fp_out, fn=fn, zmw_filter_func=internal_median_zmw_subread)
+    run_streamed_median_filter(fp_in, fp_out, fn=fn, zmw_filter_func=internal_median_zmw_subread)
 
 ##############################
 ### Main and cmds.         ###
@@ -157,7 +160,7 @@ def cmd_run_pass_filter(args):
 
 def cmd_run_streamed_median_filter(args):
     with open_stream(args.input_path) as fp_in:
-        run_streamed_median(fp_in, sys.stdout, args.input_path)
+        run_streamed_median_filter(fp_in, sys.stdout, args.input_path)
 
 def cmd_run_median_filter(args):
     # Don't allow '-' for the double-pass median filter.
