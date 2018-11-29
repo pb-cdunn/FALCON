@@ -68,9 +68,13 @@ WAIT = 20 # seconds to wait for file to exist
 
 
 def filter_DBsplit_option(opt):
-    """We want -a by default, but if we see --no-a[ll], we will not add -a.
+    """Always add -a.
+    If we want fewer reads, we rely on the fasta_filter.
+    Also, add -x, as daligner belches on any read < kmer length.
     """
     flags = opt.split()
+    if '-a' not in opt:
+        flags.append('-a')
     if '-x' not in opt:
         flags.append('-x70')  # daligner belches on any read < kmer length
     return ' '.join(flags)
@@ -85,7 +89,7 @@ def script_build_db(config, input_fofn_fn, db):
     except Exception:
         LOG.exception('Using "cat" by default.')
         cat_fasta = 'cat '
-    DBdust = 'DBdust {} {}'.format(config.get('pa_DBdust_option', ''), db)
+    DBdust = 'DBdust {} {}'.format(config.get('DBdust_opt', ''), db)
     fasta_filter_option = config.get('fasta_filter_option', 'pass')
     params.update(locals())
     script = """\
@@ -1005,6 +1009,7 @@ def get_ours(config_fn, db_fn):
         ours['user_length_cutoff'] = int(config.get('length_cutoff_pr', '0'))
         ours['fasta_filter_option'] = 'pass'
     else:
+        ours['DBdust_opt'] = config.get('pa_DBdust_option', '')
         ours['DBsplit_opt'] = config.get('pa_DBsplit_option', '')
         ours['daligner_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCdaligner_option', '')
         ours['TANmask_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCTANmask_option', '')
