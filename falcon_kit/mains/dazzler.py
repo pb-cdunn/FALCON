@@ -68,9 +68,13 @@ WAIT = 20 # seconds to wait for file to exist
 
 
 def filter_DBsplit_option(opt):
-    """We want -a by default, but if we see --no-a[ll], we will not add -a.
+    """Always add -a.
+    If we want fewer reads, we rely on the fasta_filter.
+    Also, add -x, as daligner belches on any read < kmer length.
     """
     flags = opt.split()
+    if '-a' not in opt:
+        flags.append('-a')
     if '-x' not in opt:
         flags.append('-x70')  # daligner belches on any read < kmer length
     return ' '.join(flags)
