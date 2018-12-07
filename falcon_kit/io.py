@@ -102,11 +102,15 @@ def open_progress(fn, mode='r', log=LOG.info):
         yield get_iter(stream, fp)
     fp.finish()
 
+
 def read_as_msgpack(stream):
     import msgpack
     content = stream.read()
     log('  Read {} as msgpack'.format(eng(len(content))))
-    return msgpack.loads(content)
+    return msgpack.loads(content,
+            max_map_len=2**20,
+            max_array_len=2**20,
+    )
 
 
 def read_as_json(stream):
