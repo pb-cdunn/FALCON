@@ -24,7 +24,7 @@ except Exception:
     local_version = ''
 
 setup(name='falcon_kit',
-      version='1.2.4' + local_version, # should match __init__.py:__version__, sans +git...
+      version='1.2.5' + local_version, # should match __init__.py:__version__, sans +git...
       description='a small toolkit for DNA seqeucne alignment, overlapping, and assembly',
       author='Jason Chin',
       author_email='jchin@pacificbiosciences.com',
