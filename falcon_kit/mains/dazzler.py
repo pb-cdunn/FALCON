@@ -1004,6 +1004,7 @@ def get_ours(config_fn, db_fn):
     ours['genome_size'] = int(config['genome_size'])
     ours['seed_coverage'] = float(config['seed_coverage'])
     if os.path.basename(db_fn).startswith('preads'):
+        ours['DBdust_opt'] = config.get('ovlp_DBdust_option', '')
         ours['DBsplit_opt'] = config.get('ovlp_DBsplit_option', '')
         ours['daligner_opt'] = config.get('ovlp_daligner_option', '') + ' ' + config.get('ovlp_HPCdaligner_option', '')
         ours['user_length_cutoff'] = int(config.get('length_cutoff_pr', '0'))
