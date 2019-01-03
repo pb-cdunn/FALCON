@@ -419,7 +419,7 @@ def update_defaults(cfg):
             'job_type', 'job_queue', 'job_name_style',
             'use_tmpdir',
     ]
-    for step in ['bd', 'da', 'la', 'pda', 'pla', 'fc', 'cns', 'asm']:
+    for step in ['dust', 'da', 'la', 'pda', 'pla', 'fc', 'cns', 'asm']:
         sge_option_key = 'sge_option_' + step
         possible_extra_keys.append(sge_option_key)
         concurrent_jobs_key = step + '_concurrent_jobs'
