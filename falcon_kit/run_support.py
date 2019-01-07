@@ -365,6 +365,7 @@ def update_defaults(cfg):
     set_default('pa_fasta_filter_option', 'streamed-internal-median')
     set_default('dazcon', False)
     set_default('pa_dazcon_option', '-j 4 -x -l 500')
+    set_default('ovlp_DBdust_option', '')
     set_default('ovlp_DBsplit_option', '-x500 -s200 -a')
     set_default('falcon_sense_option', '--output-multi --min-idt 0.70 --min-cov 2 --max-n-read 1800')
     set_default('falcon_sense_skip_contained', False)
@@ -384,7 +385,7 @@ def update_defaults(cfg):
 
     if 'dust' in cfg:
         logger.warning(
-            "The 'dust' option is deprecated and ignored. We always run DBdust now. Use pa_DBdust_option to override its default arguments.")
+            "The 'dust' option is deprecated and ignored. We always run DBdust now. Use ovlp_/pa_DBdust_option to override DBdust default arguments.")
 
     bash.BUG_avoid_Text_file_busy = cfg[TEXT_FILE_BUSY]
 
@@ -454,6 +455,7 @@ def check_unexpected_keys(cfg):
         'pa_REPmask_code',
         'pa_daligner_option',
         'pa_HPCdaligner_option',
+        'ovlp_DBdust_option',
         'ovlp_DBsplit_option',
         #'ovlp_HPCTANmask_option',
         'ovlp_daligner_option',
