@@ -587,6 +587,7 @@ consensus_data * generate_consensus( char ** input_seq,
     //char * consensus;
     consensus_data * consensus;
     double max_diff;
+    const unsigned int lk_ptr_size = (1 << (K * 2));
     max_diff = 1.0 - min_idt;
 
     seq_count = n_seq;
@@ -597,11 +598,11 @@ consensus_data * generate_consensus( char ** input_seq,
     fflush(stdout);
 
     tags_list = calloc( seq_count, sizeof(align_tags_t *) );
-    lk_ptr = allocate_kmer_lookup( 1 << (K * 2) );
+    lk_ptr = allocate_kmer_lookup( lk_ptr_size );
     sa_ptr = allocate_seq( (seq_coor_t) strlen( input_seq[0]) );
     sda_ptr = allocate_seq_addr( (seq_coor_t) strlen( input_seq[0]) );
     add_sequence( 0, K, input_seq[0], strlen(input_seq[0]), sda_ptr, sa_ptr, lk_ptr);
-    //mask_k_mer(1 << (K * 2), lk_ptr, 16);
+    mask_k_mer(lk_ptr_size, lk_ptr, 10000);
 
     aligned_seq_count = 0;
     for (j=1; j < seq_count; j++) {
