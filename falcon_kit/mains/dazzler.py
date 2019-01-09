@@ -89,15 +89,34 @@ def script_build_db(config, input_fofn_fn, db):
     except Exception:
         LOG.exception('Using "cat" by default.')
         cat_fasta = 'cat '
+
     DBdust = 'DBdust {} {}'.format(config.get('DBdust_opt', ''), db)
     fasta_filter_option = config.get('fasta_filter_option', 'pass')
+    subsample_coverage = config.get('subsample_coverage', 0)
+    subsample_strategy = config.get('subsample_strategy', 'random')
+    subsample_random_seed = config.get('subsample_random_seed', 0)
+    genome_size = config.get('genome_size', 0)
+
+    zmw_whitelist_option = ''
+    use_subsampling = 0
+
+    if subsample_coverage > 0:
+        use_subsampling = 1
+        zmw_whitelist_option = '--zmw-whitelist-fn zmw.whitelist.json'
+
     params.update(locals())
     script = """\
 echo "PBFALCON_ERRFILE=$PBFALCON_ERRFILE"
 set -o pipefail
 rm -f {db}.db .{db}.* # in case of re-run
 #fc_fasta2fasta < {input_fofn_fn} >| fc.fofn
-while read fn; do  {cat_fasta} ${{fn}} | python -m falcon_kit.mains.fasta_filter {fasta_filter_option} - | fasta2DB -v {db} -i${{fn##*/}}; done < {input_fofn_fn}
+zmw_whitelist_option=""
+use_subsampling={use_subsampling}
+if [[ $use_subsampling -eq 1 ]]; then
+    python -m falcon_kit.mains.fasta_subsample --coverage "{subsample_coverage}" --random-seed "{subsample_random_seed}" --strategy "{subsample_strategy}" --genome-size "{genome_size}" "{input_fofn_fn}" zmw
+    zmw_whitelist_option="--zmw-whitelist-fn zmw.whitelist.json"
+fi
+while read fn; do  {cat_fasta} ${{fn}} | python -m falcon_kit.mains.fasta_filter ${{zmw_whitelist_option}} {fasta_filter_option} - | fasta2DB -v {db} -i${{fn##*/}}; done < {input_fofn_fn}
 #cat fc.fofn | xargs rm -f
 {DBdust}
 """.format(**params)
@@ -1009,6 +1028,11 @@ def get_ours(config_fn, db_fn):
         ours['daligner_opt'] = config.get('ovlp_daligner_option', '') + ' ' + config.get('ovlp_HPCdaligner_option', '')
         ours['user_length_cutoff'] = int(config.get('length_cutoff_pr', '0'))
         ours['fasta_filter_option'] = 'pass'
+        ours['genome_size'] = int(config.get('genome_size', 0))
+        ours['subsample_coverage'] = 0
+        ours['subsample_random_seed'] = int(config.get('pa_subsample_random_seed', 0))
+        ours['subsample_strategy'] = config.get('pa_subsample_strategy', 'random')
+
     else:
         ours['DBdust_opt'] = config.get('pa_DBdust_option', '')
         ours['DBsplit_opt'] = config.get('pa_DBsplit_option', '')
@@ -1017,6 +1041,10 @@ def get_ours(config_fn, db_fn):
         ours['REPmask_opt'] = config.get('pa_daligner_option', '') + ' ' + config.get('pa_HPCREPmask_option', '')
         ours['user_length_cutoff'] = int(config.get('length_cutoff', '0'))
         ours['fasta_filter_option'] = config.get('pa_fasta_filter_option', 'pass')
+        ours['genome_size'] = int(config.get('genome_size', 0))
+        ours['subsample_coverage'] = int(config.get('pa_subsample_coverage', 0))
+        ours['subsample_random_seed'] = int(config.get('pa_subsample_random_seed', 0))
+        ours['subsample_strategy'] = config.get('pa_subsample_strategy', 'random')
 
     LOG.info('config({!r}):\n{}'.format(config_fn, config))
     LOG.info('our subset of config:\n{}'.format(ours))
