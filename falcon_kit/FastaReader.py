@@ -162,11 +162,13 @@ class FastaRecord(object):
 
 # These are refactored from ReaderBase/FastaReader.
 
-def yield_fasta_records(f, fn, log=LOG.info):
+def yield_fasta_record(f, fn=None, log=LOG.info):
     """
     f: fileobj
-    fn: str - filename (for exceptions)
+    fn: str - filename (for exceptions); inferred from f.name if not provided
     """
+    if not fn:
+        fn = getattr(f, 'name', None)
     counter = FilePercenter(fn, log=log)
     try:
         parts = splitFileContents(f, ">")
@@ -177,6 +179,8 @@ def yield_fasta_records(f, fn, log=LOG.info):
     except AssertionError:
         raise Exception("Invalid FASTA file {!r}".format(fn))
 
+def yield_fasta_records(f, fn=None, log=LOG.info):
+    return yield_fasta_record(f, fn, log)
 
 def stream_stdout(call, fn):
     args = call.split()
@@ -189,7 +193,7 @@ def open_fasta_reader(fn, log=LOG.info):
     """
     fn: str - filename
 
-    Note: If you already have a fileobj, you can iterate over yield_fasta_records() directly.
+    Note: If you already have a fileobj, you can iterate over yield_fasta_record() directly.
 
     Streaming reader for FASTA files, useable as a one-shot iterator
     over FastaRecord objects.  Agnostic about line wrapping.
@@ -218,7 +222,7 @@ def open_fasta_reader(fn, log=LOG.info):
         filename = fn
     else:
         ofs = open(filename, mode)
-    yield yield_fasta_records(ofs, filename, log=log)
+    yield yield_fasta_record(ofs, filename, log=log)
     ofs.close()
 
 
