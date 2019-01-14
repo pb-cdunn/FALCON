@@ -11,6 +11,7 @@ import contextlib
 import gzip
 import logging
 import md5
+import os
 import re
 import subprocess
 import sys
@@ -167,8 +168,11 @@ def yield_fasta_record(f, fn=None, log=LOG.info):
     f: fileobj
     fn: str - filename (for exceptions); inferred from f.name if not provided
     """
-    if not fn:
+    if not fn and f is not sys.stdin:
         fn = getattr(f, 'name', None)
+        if fn is not None and not os.path.exists(fn):
+            log('Not sure what to do with FASTA file name="{}"'.format(fn))
+            fn = ''
     counter = FilePercenter(fn, log=log)
     try:
         parts = splitFileContents(f, ">")
