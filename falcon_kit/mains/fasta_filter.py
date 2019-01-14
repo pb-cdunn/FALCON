@@ -9,16 +9,68 @@ import collections
 import itertools
 import logging
 import contextlib
+import json
 
 LOG = logging.getLogger()
 
 ZMWTuple = collections.namedtuple('ZMWTuple', ['movie_name', 'zmw_id', 'subread_start', 'subread_end', 'seq_len', 'subread_record', 'subread_header', 'subread_id'])
 
+def check_in_whitelist(whitelist_set, movie_name, zmw_id):
+    """
+    >>> check_in_whitelist([], 'foo', '1')
+    False
+    >>> check_in_whitelist(['bar/1'], 'foo', '1')
+    False
+    >>> check_in_whitelist(['foo/1'], 'foo', '1')
+    True
+    """
+    movie_zmw = '{}/{}'.format(movie_name, zmw_id)
+    return movie_zmw in whitelist_set
+
 def tokenize_header(seq_header):
+    """
+    >>> tokenize_header('foo/123/0_100')
+    ('foo', '123', 0, 100)
+    """
     rid = seq_header.split()[0]
     movie_name, zmw_id, subread_pos = rid.split('/')
     subread_start, subread_end = [int(val) for val in subread_pos.split('_')]
     return movie_name, zmw_id, subread_start, subread_end
+
+def yield_record_and_tokenized_headers(whitelist_set, records):
+    """For each record, yield (record, tokens)
+    but only if whitelisted.
+
+    records: iterable
+    whitelist_set: has __contains__, but empty means use everything.
+    """
+    for record in records:
+        tokens = tokenize_header(record.name)
+        movie_name, zmw_id, subread_start, subread_end = tokens
+        if whitelist_set and not check_in_whitelist(whitelist_set, movie_name, zmw_id):
+            continue
+        yield record, tokens
+
+def yield_record(whitelist_set, records):
+    """Yield each record,
+    but only if whitelisted.
+
+    This is an optimized version of yield_record_and_tokenized_headers(),
+    to avoid tokenizing when we have no whitelist.
+
+    records: iterable
+    whitelist_set: has __contains__, but empty means use everything.
+    """
+    for record in records:
+        if not whitelist_set:
+            # no need to tokenize
+            yield record
+            continue
+        tokens = tokenize_header(record.name)
+        movie_name, zmw_id, subread_start, subread_end = tokens
+        if not check_in_whitelist(whitelist_set, movie_name, zmw_id):
+            continue
+        yield record
 
 def longest_zmw_subread(zmw_subreads):
     """Return subread_record with longest seq_len.
@@ -70,128 +122,165 @@ def internal_median_zmw_subread(zmw_subreads):
 ##############################
 ### Streamed-median filter ###
 ##############################
-def yield_zmwtuples(records):
-    for record in records:
-        movie_name, zmw_id, subread_start, subread_end = tokenize_header(record.name)
+def yield_zmwtuple(records, whitelist_set, store_record):
+    subread_id = 0
+    for (record, tokens) in yield_record_and_tokenized_headers(whitelist_set, records):
+        movie_name, zmw_id, subread_start, subread_end = tokens
+        record_to_store = record if store_record else None
         zrec = ZMWTuple(movie_name=movie_name, zmw_id=zmw_id,
                         subread_start=subread_start, subread_end=subread_end,
-                        seq_len=len(record.sequence), subread_record=record,
-                        subread_header=record.name, subread_id=0)
+                        seq_len=len(record.sequence), subread_record=record_to_store,
+                        subread_header=record.name, subread_id=subread_id)
+        subread_id += 1
         yield zrec
 
-def run_streamed_filter(fp_in, fp_out, fn, zmw_filter_func):
-    fasta_records = FastaReader.yield_fasta_records(fp_in, fn, log=LOG.info)
-    for zmw_id, zmw_subreads in itertools.groupby(yield_zmwtuples(fasta_records), lambda x: x.zmw_id):
+def write_streamed(fp_out, yield_zmwtuple_func, zmw_filter_func):
+    for zmw_id, zmw_subreads in itertools.groupby(yield_zmwtuple_func(store_record=True), lambda x: x.zmw_id):
         zrec = zmw_filter_func(list(zmw_subreads))
         fp_out.write(str(zrec.subread_record))
         fp_out.write('\n')
 
-def run_streamed_median_filter(fp_in, fp_out, fn='-', zmw_filter_func=median_zmw_subread):
-    run_streamed_filter(fp_in, fp_out, fn, zmw_filter_func)
+def run_streamed_median_filter(fp_in, fp_out, whitelist_set, zmw_filter_func=median_zmw_subread):
+    def yield_zmwtuple_func(store_record=True):
+        fasta_records = FastaReader.yield_fasta_record(fp_in, log=LOG.info)
+        return yield_zmwtuple(fasta_records, whitelist_set, store_record)
+    write_streamed(fp_out, yield_zmwtuple_func, zmw_filter_func)
 
 ##############################
 ### Longest filter.
 ##############################
-def run_streamed_longest_filter(fp_in, fp_out, fn):
-    run_streamed_filter(fp_in, fp_out, fn, zmw_filter_func=longest_zmw_subread)
+def run_streamed_longest_filter(fp_in, fp_out, whitelist_set):
+    def yield_zmwtuple_func(store_record=True):
+        fasta_records = FastaReader.yield_fasta_record(fp_in, log=LOG.info)
+        return yield_zmwtuple(fasta_records, whitelist_set, store_record)
+    write_streamed(fp_out, yield_zmwtuple_func, zmw_filter_func=longest_zmw_subread)
 
 ##############################
 ### Pass filter.           ###
 ##############################
-def run_pass_filter(fp_in, fp_out, fn):
-    for record in FastaReader.yield_fasta_records(fp_in, fn, log=LOG.info):
+def run_pass_filter(fp_in, fp_out, whitelist_set):
+    for record in yield_record(whitelist_set, FastaReader.yield_fasta_record(fp_in, log=LOG.info)):
         fp_out.write(str(record))
         fp_out.write('\n')
 
 ##################################
 ### Double-pass median filter. ###
 ##################################
-def run_median_filter(fp_in, fp_out, fn, zmw_filter_func=median_zmw_subread):
-    # Expect an actual file, not a stream.
-    assert(os.path.exists(fn))
-
-    # Needed to jump back for the second pass.
-    fp_in_start = fp_in.tell()
-
+def write_doublepass_median(fp_out, yield_zmwtuple_func, zmw_filter_func=median_zmw_subread):
     # Stores all subreads for a ZMW.
     zmw_dict = collections.defaultdict(list)
 
     # First pass, collect all ZMW info.
-    for record in FastaReader.yield_fasta_records(fp_in, fn, log=LOG.info):
-        movie_name, zmw_id, subread_start, subread_end = tokenize_header(record.name)
+    for zrec in yield_zmwtuple_func(store_record=False):
         # Store None instead of the actual record to free the memory after yield.
-        zrec = ZMWTuple(movie_name=movie_name, zmw_id=zmw_id,
-                        subread_start=subread_start, subread_end=subread_end,
-                        seq_len=len(record.sequence), subread_record=None,
-                        subread_header=record.name, subread_id=len(zmw_dict[zmw_id]))
+        zmw_id = zrec.zmw_id
         zmw_dict[zmw_id].append(zrec)
 
-    # For each ZMW, keep only one particular subread, specified by it's order of
-    # appearance in the input FASTA file (stored in median_zrec.subread_id).
-    whitelist = collections.defaultdict(int)
+    # For each ZMW, keep only one particular subread.
+    selected = collections.defaultdict(int)
     for zmw_id, zmw_subreads in zmw_dict.iteritems():
         median_zrec = zmw_filter_func(list(zmw_subreads))
-        whitelist[zmw_id] = median_zrec.subread_id
+        selected[zmw_id] = median_zrec.subread_id
 
     # Second pass, yield selected sequences.
-    # Rewind.
-    fp_in.seek(fp_in_start, os.SEEK_SET)
-    # Fly-through.
-    for record in FastaReader.yield_fasta_records(fp_in, fn, log=LOG.info):
-        movie_name, zmw_id, subread_start, subread_end = tokenize_header(record.name)
-        # Write-out only one particular subread from the ZMW.
-        if whitelist[zmw_id] == 0:
-            fp_out.write(str(record))
+    # This must be exactly the same order, so we end up with the same computed subread_id for each record.
+    for zrec in yield_zmwtuple_func(store_record=True):
+        zmw_id = zrec.zmw_id
+        subread_id = zrec.subread_id
+        if selected[zmw_id] == subread_id:
+            fp_out.write(str(zrec.subread_record))
             fp_out.write('\n')
-        whitelist[zmw_id] -= 1
+
+def run_median_filter(fp_in, fp_out, whitelist_set, zmw_filter_func=median_zmw_subread):
+    # Needed to jump back for the second pass.
+    # Expect an actual file, not a pipe.
+    try:
+        fp_in_start = fp_in.tell()
+        fp_in.seek(fp_in_start)
+    except Exception as e:
+        msg = 'fileobj.tell()/seek() failed. Cannot rewind, so cannot do multi-pass. {}\n{}'.format(
+            type(fp_in), dir(fp_in))
+        raise AssertionError(msg, e)
+
+    def yield_zmwtuple_func(store_record=True):
+        # Rewind.
+        fp_in.seek(fp_in_start, os.SEEK_SET)
+
+        fasta_records = FastaReader.yield_fasta_record(fp_in, log=LOG.info)
+        return yield_zmwtuple(fasta_records, whitelist_set, store_record)
+
+    write_doublepass_median(fp_out, yield_zmwtuple_func, zmw_filter_func)
 
 ###############################
 ### Internal median filter. ###
 ###############################
-def run_internal_median_filter(fp_in, fp_out, fn):
-    run_median_filter(fp_in, fp_out, fn, zmw_filter_func=internal_median_zmw_subread)
+def run_internal_median_filter(fp_in, fp_out, whitelist_set):
+    run_median_filter(fp_in, fp_out, whitelist_set, zmw_filter_func=internal_median_zmw_subread)
 
 #######################################
 ### Streamed internal median filter ###
 #######################################
-def run_streamed_internal_median_filter(fp_in, fp_out, fn='-'):
-    run_streamed_median_filter(fp_in, fp_out, fn=fn, zmw_filter_func=internal_median_zmw_subread)
+def run_streamed_internal_median_filter(fp_in, fp_out, whitelist_set):
+    run_streamed_median_filter(fp_in, fp_out, whitelist_set=whitelist_set, zmw_filter_func=internal_median_zmw_subread)
 
 ##############################
 ### Main and cmds.         ###
 ##############################
 @contextlib.contextmanager
-def open_stream(input_path):
+def open_input_stream(input_path):
+    """stdin if '-'
+    """
     if input_path == '-':
         yield sys.stdin
     else:
         with open(input_path) as stream:
             yield stream
 
+def load_zmw_whitelist(zmw_whitelist_fn):
+    """Read from json filename, or do nothing if null fn.
+    Return as a set, empty-set if empty.
+    Raise if missing non-null fn.
+    """
+    ret = set()
+    if not zmw_whitelist_fn:
+        return set()
+    with open(zmw_whitelist_fn, 'r') as fp_in:
+        try:
+            return set(json.loads(fp_in.read()))
+        except ValueError:
+            LOG.error('Failed to parse "{}" as JSON. Assuming empty whitelist.'.format(zmw_whitelist_fn))
+            return set()
+
 def cmd_run_pass_filter(args):
-    with open_stream(args.input_path) as fp_in:
-        run_pass_filter(fp_in, sys.stdout, args.input_path)
+    whitelist_set = load_zmw_whitelist(args.zmw_whitelist_fn)
+    with open_input_stream(args.input_path) as fp_in:
+        run_pass_filter(fp_in, sys.stdout, whitelist_set)
 
 def cmd_run_streamed_longest_filter(args):
-    with open_stream(args.input_path) as fp_in:
-        run_streamed_longest_filter(fp_in, sys.stdout, args.input_path)
+    whitelist_set = load_zmw_whitelist(args.zmw_whitelist_fn)
+    with open_input_stream(args.input_path) as fp_in:
+        run_streamed_longest_filter(fp_in, sys.stdout, whitelist_set)
 
 def cmd_run_streamed_median_filter(args):
-    with open_stream(args.input_path) as fp_in:
-        run_streamed_median_filter(fp_in, sys.stdout, args.input_path)
+    whitelist_set = load_zmw_whitelist(args.zmw_whitelist_fn)
+    with open_input_stream(args.input_path) as fp_in:
+        run_streamed_median_filter(fp_in, sys.stdout, whitelist_set)
 
 def cmd_run_median_filter(args):
+    whitelist_set = load_zmw_whitelist(args.zmw_whitelist_fn)
     # Don't allow '-' for the double-pass median filter.
     with open(args.input_path, 'r') as fp_in:
-        run_median_filter(fp_in, sys.stdout, args.input_path)
+        run_median_filter(fp_in, sys.stdout, whitelist_set)
 
 def cmd_run_internal_median_filter(args):
+    whitelist_set = load_zmw_whitelist(args.zmw_whitelist_fn)
     with open(args.input_path, 'r') as fp_in:
-        run_internal_median_filter(fp_in, sys.stdout, args.input_path)
+        run_internal_median_filter(fp_in, sys.stdout, whitelist_set)
 
 def cmd_run_streamed_internal_median_filter(args):
-    with open_stream(args.input_path) as fp_in:
-        run_streamed_internal_median_filter(fp_in, sys.stdout, args.input_path)
+    whitelist_set = load_zmw_whitelist(args.zmw_whitelist_fn)
+    with open_input_stream(args.input_path) as fp_in:
+        run_streamed_internal_median_filter(fp_in, sys.stdout, whitelist_set)
 
 class HelpF(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
@@ -201,6 +290,12 @@ def parse_args(argv):
     parser = argparse.ArgumentParser(
         description=description,
         formatter_class=HelpF,
+    )
+
+    parser.add_argument(
+        '--zmw-whitelist-fn', default='',
+        help='A JSON file containing a list of "movie_name/zmw" IDs to retain. If the file is an empty list, all ZMWs will be used; otherwise, only the listed ones will be whitelisted. (Applies to all filters.)',
+        required = False,
     )
 
     subparsers = parser.add_subparsers(help='sub-command help')
@@ -218,11 +313,11 @@ def parse_args(argv):
             help=help_pass)
     parser_pass.set_defaults(func=cmd_run_pass_filter)
 
-    parser_pass = subparsers.add_parser('streamed-longest',
+    parser_streamed_longest = subparsers.add_parser('streamed-longest',
             formatter_class=HelpF,
             description=help_streamed_longest,
             help=help_streamed_longest)
-    parser_pass.set_defaults(func=cmd_run_streamed_longest_filter)
+    parser_streamed_longest.set_defaults(func=cmd_run_streamed_longest_filter)
 
     parser_median = subparsers.add_parser('median',
             formatter_class=HelpF,
