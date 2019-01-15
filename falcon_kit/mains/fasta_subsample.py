@@ -1,5 +1,4 @@
-#! /usr/bin/env python2.7
-
+#!/usr/bin/env python2.7
 """
 Performs a single pass over an input FASTA/FOFN, and collects
 all ZMWs. For each ZMW it calculates the expected molecular size by picking
@@ -8,10 +7,11 @@ The script outputs a JSON file with a whitelist of ZMWs selected by a given
 strategy (random, longest, etc.) and desired coverage of a genome.
 Author: Ivan Sovic
 """
+from falcon_kit.mains.fasta_filter import ZMWTuple
+from falcon_kit.util.system import set_random_seed
 
 import falcon_kit.FastaReader as FastaReader
 import falcon_kit.mains.fasta_filter as fasta_filter
-from falcon_kit.mains.fasta_filter import ZMWTuple
 import falcon_kit.io as io
 
 import os
@@ -22,7 +22,6 @@ import contextlib
 import itertools
 import random
 import json
-import time
 import copy
 
 LOG = logging.getLogger()
@@ -194,14 +193,11 @@ def main(argv=sys.argv):
     logging.basicConfig(level=logging.INFO)
 
     strategy_func = get_strategy_func(args.strategy)
+    LOG.info('Using subsampling strategy: "{strategy}"'.format(strategy=args.strategy))
 
-    random_seed = args.random_seed if args.random_seed else int(time.time())
-    random.seed(random_seed)
+    set_random_seed(args.random_seed)
 
     input_files = list(io.yield_abspath_from_fofn(args.input_fn))
-
-    LOG.info('Using subsampling strategy: "{strategy}"'.format(strategy=args.strategy))
-    LOG.info('Random seed for subsampling input data: "{random_seed}"'.format(random_seed=random_seed))
 
     zmws_whitelist, zmws_all, stats_dict  = run(
             fasta_filter.yield_zmwtuple(yield_record(input_files), None, False), args.coverage, args.genome_size, strategy_func)
