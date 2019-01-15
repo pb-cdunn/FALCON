@@ -1,6 +1,5 @@
-
-
 import falcon_kit.util.system as mod
+import falcon_kit.util.system
 from falcon_kit.run_support import cd
 from falcon_kit.io import mkdirs
 import helpers
@@ -99,3 +98,17 @@ def test_make_fofn_abs(tmpdir):
             stream.write('link\n')
         mod.make_fofn_abs(i_fn, o_fn)
         assert open(o_fn).read() == expected
+
+
+def test_set_random_seed(monkeypatch, mocker):
+    TIME = 99
+    monkeypatch.setattr(falcon_kit.util.system.time, 'time', lambda: TIME)
+    mocker.patch('falcon_kit.util.system.random.seed')
+
+    mod.set_random_seed(42)
+    mod.random.seed.assert_called_once_with(42)
+
+    mocker.resetall()
+
+    mod.set_random_seed(0)
+    mod.random.seed.assert_called_once_with(TIME)

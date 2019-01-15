@@ -3,10 +3,12 @@ from __future__ import absolute_import
 
 from future.utils import viewitems
 from pypeflow.io import cd, capture
+import fnmatch
 import logging
 import os
 import pprint
-import fnmatch
+import random
+import time
 
 log = logging.getLogger(__name__)
 
@@ -116,3 +118,9 @@ def make_executable(path):
     mode = os.stat(path).st_mode
     mode |= (mode & 0o444) >> 2    # copy R bits to X
     os.chmod(path, mode)
+
+
+def set_random_seed(seed):
+    seed = seed if seed else int(time.time())
+    random.seed(seed)
+    log.info('Random seed: {}'.format(seed))
