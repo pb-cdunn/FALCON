@@ -363,6 +363,9 @@ def update_defaults(cfg):
     set_default('skip_checks', False)
     set_default('pa_DBdust_option', '') # Gene recommends the defaults. I have tried -w128 -t2.5 -m20
     set_default('pa_fasta_filter_option', 'streamed-internal-median')
+    set_default('pa_subsample_coverage', 0)
+    set_default('pa_subsample_strategy', 'random')
+    set_default('pa_subsample_random_seed', 12345)
     set_default('dazcon', False)
     set_default('pa_dazcon_option', '-j 4 -x -l 500')
     set_default('ovlp_DBdust_option', '')
@@ -395,12 +398,18 @@ def update_defaults(cfg):
     if 'local_match_count' in falcon_sense_option or 'output_dformat' in falcon_sense_option:
         raise Exception('Please remove obsolete "--local_match_count_*" or "--output_dformat"' +
                         ' from "falcon_sense_option" in your cfg: %s' % repr(falcon_sense_option))
+    genome_size = int(cfg['genome_size'])
     length_cutoff = int(cfg['length_cutoff'])
-    if length_cutoff < 0:
-        genome_size = int(cfg['genome_size'])
+    if length_cutoff < 0 and genome_size < 1:
+        raise Exception(
+            'Must specify either length_cutoff>0 or genome_size>0')
+    pa_subsample_strategy = cfg['pa_subsample_strategy']
+    pa_subsample_random_seed = int(cfg['pa_subsample_random_seed'])
+    pa_subsample_coverage = int(cfg['pa_subsample_coverage'])
+    if pa_subsample_coverage > 0:
         if genome_size < 1:
             raise Exception(
-                'Must specify either length_cutoff>0 or genome_size>0')
+                'Must specify genome_size > 0 for subsampling.')
 
     # This one depends on length_cutoff_pr for its default.
     fc_ovlp_to_graph_option = cfg['fc_ovlp_to_graph_option']
@@ -449,6 +458,9 @@ def check_unexpected_keys(cfg):
         'pa_dazcon_option',
         'pa_DBdust_option',
         'pa_fasta_filter_option',
+        'pa_subsample_coverage',
+        'pa_subsample_strategy',
+        'pa_subsample_random_seed',
         'pa_DBsplit_option',
         'pa_HPCTANmask_option',
         'pa_HPCREPmask_option',
