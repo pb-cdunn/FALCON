@@ -21,6 +21,7 @@ export PYTHONUSERBASE=$(pwd)/LOCAL
 export PATH=${PYTHONUSERBASE}/bin:${PATH}
 WHEELHOUSE="/mnt/software/p/python/wheelhouse/develop/"
 
+pip install --user --no-index --find-links=${WHEELHOUSE} pytest pytest-mock pytest-cov
 #pip install --user --no-index --find-links=${WHEELHOUSE} pypeflow
 #
 ## Unfortunately, we need pypeflow for pylint.
