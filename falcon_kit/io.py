@@ -108,8 +108,8 @@ def read_as_msgpack(stream):
     content = stream.read()
     log('  Read {} as msgpack'.format(eng(len(content))))
     return msgpack.loads(content,
-            max_map_len=2**20,
-            max_array_len=2**20,
+            max_map_len=2**25,
+            max_array_len=2**25,
     )
 
 
