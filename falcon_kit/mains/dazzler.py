@@ -108,7 +108,7 @@ def script_build_db(config, input_fofn_fn, db):
     script = """\
 echo "PBFALCON_ERRFILE=$PBFALCON_ERRFILE"
 set -o pipefail
-rm -f {db}.db .{db}.* # in case of re-run
+rm -f {db}.db {db}.dam .{db}.* # in case of re-run
 #fc_fasta2fasta < {input_fofn_fn} >| fc.fofn
 zmw_whitelist_option=""
 use_subsampling={use_subsampling}
@@ -246,9 +246,10 @@ def symlink_db(db_fn, symlink=symlink):
     Exact matches will probably cause an exception in symlink().
     """
     db_dirname, db_basename = os.path.split(db_fn)
-    dbname = os.path.splitext(db_basename)[0]
+    dbname, suffix = os.path.splitext(db_basename)
 
-    fn = os.path.join(db_dirname, dbname + '.db')
+    # Note: could be .db or .dam
+    fn = os.path.join(db_dirname, dbname + suffix)
     symlink(fn)
 
     re_suffix = re.compile(r'^\.%s(\.idx|\.bps|\.dust\.data|\.dust\.anno|\.tan\.data|\.tan\.anno|\.rep\d+\.data|\.rep\d+\.anno)$'%dbname)
