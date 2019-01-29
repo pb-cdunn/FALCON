@@ -8,7 +8,6 @@ import os
 import re
 import sys
 import time
-from ..util.io import (yield_validated_fns)
 from .. import io, functional
 from .. import(
         bash,  # for write_sub_script

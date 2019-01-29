@@ -244,7 +244,7 @@ def yield_validated_fns(fofn):
     """Return list of filenames from fofn, either abs or relative to CWD instead of dir of fofn.
     Assert none are empty/non-existent.
     """
-    dirname = os.path.normpath(os.path.dirname(fofn)) # normpath makes '' become '.'
+    dirname = os.path.normpath(os.path.dirname(os.path.realpath(fofn))) # normpath makes '' become '.'
     try:
         fns = deserialize(fofn)
     except:
@@ -254,7 +254,7 @@ def yield_validated_fns(fofn):
         for fn in fns:
             assert fn
             if not os.path.isabs(fn):
-                fn = os.path.normpath(os.path.join(dirname, fn))
+                fn = os.path.normpath(os.path.relpath(os.path.join(dirname, fn)))
             assert os.path.isfile(fn), 'File {!r} is not a file.'.format(fn)
             assert filesize(fn), '{!r} has size {}'.format(fn, filesize(fn))
             yield fn
