@@ -61,6 +61,9 @@
 #include <stdint.h>
 #include "common.h"
 
+// #define DEBUG_DETAILED_VERBOSE
+// #define DEBUG_PRINT_CONS_STATUS
+
 typedef struct {
     seq_coor_t t_pos;
     uint8_t delta;
@@ -106,7 +109,8 @@ typedef msa_delta_group_t * msa_pos_t;
 align_tags_t * get_align_tags( char * aln_q_seq,
                                char * aln_t_seq,
                                seq_coor_t aln_seq_len,
-                               aln_range * range,
+                               seq_coor_t q_start,
+                               seq_coor_t t_start,
                                unsigned q_id,
                                seq_coor_t t_offset) {
     char p_q_base;
@@ -116,8 +120,8 @@ align_tags_t * get_align_tags( char * aln_q_seq,
     tags = calloc( 1, sizeof(align_tags_t) );
     tags->len = aln_seq_len;
     tags->align_tags = calloc( aln_seq_len + 1, sizeof(align_tag_t) );
-    i = range->s1 - 1;
-    j = range->s2 - 1;
+    i = q_start - 1;
+    j = t_start - 1;
     jj = 0;
     p_j = -1;
     p_jj = 0;
@@ -148,7 +152,9 @@ align_tags_t * get_align_tags( char * aln_q_seq,
             p_jj = jj;
             p_q_base = aln_q_seq[k];
         } else {
-            break; // when there is a big alignment gap > UINT8_MAX, stop to extned the tagging string
+            // If this happens, that's fine. We simply break on large insertions,
+            // and the tag array will be ended below the loop at this k.
+            break; // when there is a big alignment gap > UINT8_MAX, stop extending the tagging string
         }
     }
     // sentinal at the end
@@ -249,6 +255,10 @@ void update_col( align_tag_col_t * col, seq_coor_t p_t_pos, uint8_t p_delta, cha
             } else {
                 col->size += 256;
             }
+            if (col->size >= UINT16_MAX-1) {
+                fprintf(stderr, "[update_col] Assert will fail! (col->size < (UINT16_MAX-1))? Values: %u >= %u\n", col->size, (UINT16_MAX-1));
+            }
+            // fflush(stderr);
             assert( col->size < UINT16_MAX-1 );
             realloc_aln_col(col);
         }
@@ -346,10 +356,12 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
         msa_array = get_msa_working_sapce(max_t_len + 1);
     }
 
+    if (t_len > max_t_len) {
+        fprintf(stderr, "[get_cns_from_align_tags]  Assert will fail!\n");
+    }
     assert(t_len <= max_t_len);
 
 #endif
-
 
     // loop through every alignment
     //printf("XX %d\n", n_tag_seqs);
@@ -380,12 +392,24 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
                 case 'G': base = 2; break;
                 case 'T': base = 3; break;
                 case '-': base = 4; break;
+                default:
+                    base = -1;
+                    fprintf(stderr, "WARNING: Bad input detected! c_tag->q_base = '%c' (int value = %d).\n", c_tag->q_base, (int) c_tag->q_base);
+                    fprintf(stderr, "[get_cns_from_align_tags]:   before update_col: j = %d / %d, i = %d\n", j, tag_seqs[i]->len, i);
+                    fprintf(stderr, "t_pos = %d, delta = %d, base = %d, c_tag->q_base = %c, c_tag->p_t_pos = %d, c_tag->p_delta = %d, c_tag->p_q_base = %d\n",
+                                t_pos, delta, base, c_tag->q_base, c_tag->p_t_pos, c_tag->p_delta, c_tag->p_q_base);
+                    break;
             }
+
             // Note: On bad input, base may be -1.
             update_col( &(msa_array[t_pos]->delta[delta].base[base]), c_tag->p_t_pos, c_tag->p_delta, c_tag->p_q_base);
             local_nbase[ t_pos ] ++;
         }
     }
+
+#ifdef DEBUG_DETAILED_VERBOSE
+    fprintf(stderr, "[get_cns_from_align_tags] 3: Ping!\n");
+#endif
 
     // propogate score throught the alignment links, setup backtracking information
     align_tag_col_t * g_best_aln_col = 0;
@@ -409,9 +433,19 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
         g_best_score = -1;
 
         for (i = 0; i < t_len; i++) {  //loop through every template base
+            #ifdef DEBUG_DETAILED_VERBOSE
+                fprintf(stderr, "[get_cns_from_align_tags] 3.1a: starting i = %d / %d\n", i, t_len);
+            #endif
+
             //printf("max delta: %d %d\n", i, msa_array[i]->max_delta);
             for (j = 0; j <= msa_array[i]->max_delta; j++) { // loop through every delta position
+                #ifdef DEBUG_DETAILED_VERBOSE
+                    fprintf(stderr, "     j = %d / %d; k = ", j, msa_array[i]->max_delta);
+                #endif
                 for (kk = 0; kk < 5; kk++) {  // loop through diff bases of the same delta posiiton
+                    #ifdef DEBUG_DETAILED_VERBOSE
+                        fprintf(stderr, "%d ", kk);
+                    #endif
                     /*
                     switch (kk) {
                         case 0: base = 'A'; break;
@@ -477,14 +511,30 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
                         }
                     }
                 }
+                #ifdef DEBUG_DETAILED_VERBOSE
+                    fprintf(stderr, "\n");
+                #endif
             }
+
+            #ifdef DEBUG_DETAILED_VERBOSE
+                fprintf(stderr, "[get_cns_from_align_tags] 3.1b: ending i = %d\n", i);
+            #endif
         }
         if (g_best_score == -1) {
             fprintf(stderr, "In get_cns_from_align_tags(), g_best_score==-1\n");
             return 0;
         }
+
+        if (g_best_score == -1) {
+            // This can't actually happen, because there is a check right above.
+            fprintf(stderr, "[get_cns_from_align_tags]  Assert will fail!\n");
+        }
         assert(g_best_score != -1);
     }
+
+    #ifdef DEBUG_DETAILED_VERBOSE
+        fprintf(stderr, "[get_cns_from_align_tags] 4: Ping!\n");
+    #endif
 
     // reconstruct the sequences
     unsigned int index;
@@ -539,6 +589,10 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
         }
     }
 
+    #ifdef DEBUG_DETAILED_VERBOSE
+        fprintf(stderr, "[get_cns_from_align_tags] 5: Ping!\n");
+    #endif
+
     // reverse the sequence
     for (i = 0; i < index/2; i++) {
         cns_str[i] = cns_str[i] ^ cns_str[index-i-1];
@@ -564,6 +618,11 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
 
     free(coverage);
     free(local_nbase);
+
+    #ifdef DEBUG_DETAILED_VERBOSE
+        fprintf(stderr, "[get_cns_from_align_tags] 6: Ping!\n");
+    #endif
+
     return consensus;
 }
 
@@ -589,6 +648,8 @@ consensus_data * generate_consensus( char ** input_seq,
     double max_diff;
     const unsigned int lk_ptr_size = (1 << (K * 2));
     max_diff = 1.0 - min_idt;
+
+    fprintf(stderr, "[consensus] In generate_consensus.\n");
 
     seq_count = n_seq;
     //printf("XX n_seq %d\n", n_seq);
@@ -618,7 +679,9 @@ consensus_data * generate_consensus( char ** input_seq,
 
         //arange = find_best_aln_range2(kmer_match_ptr, K, K * INDEL_ALLOWENCE_0, 5);  // narrow band to avoid aligning through big indels
 
-        //printf("2:%ld %ld %ld %ld\n\n", arange->s1, arange->e1, arange->s2, arange->e2);
+#ifdef DEBUG_PRINT_CONS_STATUS
+        fprintf(stderr, "(internal) 1:%ld %ld %ld %ld\n", arange->s1, arange->e1, arange->s2, arange->e2);
+#endif
 
 #define INDEL_ALLOWENCE_1 0.10
         if (arange->e1 - arange->s1 < 100 || arange->e2 - arange->s2 < 100 ||
@@ -637,11 +700,18 @@ consensus_data * generate_consensus( char ** input_seq,
         aln = align(input_seq[j]+arange->s1, arange->e1 - arange->s1 ,
                     input_seq[0]+arange->s2, arange->e2 - arange->s2 ,
                     INDEL_ALLOWENCE_2, 1);
+
+#ifdef DEBUG_PRINT_CONS_STATUS
+        fprintf(stderr, "(internal) 2: %lf\n\n", (((double) aln->dist / (double) aln->aln_str_size)));
+#endif
+
         if (aln->aln_str_size > 500 && ((double) aln->dist / (double) aln->aln_str_size) < max_diff) {
             tags_list[aligned_seq_count] = get_align_tags( aln->q_aln_str,
                                                            aln->t_aln_str,
                                                            aln->aln_str_size,
-                                                           arange, j,
+                                                           arange->s1,
+                                                           arange->s2,
+                                                           j,
                                                            0);
             aligned_seq_count ++;
         }
@@ -670,6 +740,133 @@ consensus_data * generate_consensus( char ** input_seq,
     free_seq_addr_array(sda_ptr);
     free_seq_array(sa_ptr);
     free_kmer_lookup(lk_ptr);
+    for (j=0; j < aligned_seq_count; j++) {
+        free_align_tags(tags_list[j]);
+    }
+    free(tags_list);
+    return consensus;
+}
+
+consensus_data * generate_consensus_from_mapping( char ** input_seq,
+                           aln_range **input_aranges,
+                           unsigned int n_seq,
+                           unsigned min_cov,
+                           unsigned K,
+                           double min_idt) {
+    unsigned int j = 0;
+    unsigned int aln_clip_offset = 0;
+    unsigned int seq_count = 0;
+    unsigned int aligned_seq_count = 0;
+    kmer_match * kmer_match_ptr = NULL;
+    aln_range * arange = NULL;
+    alignment * aln = NULL;
+    align_tags_t ** tags_list = NULL;
+    //char * consensus;
+    consensus_data * consensus = NULL;
+    double max_diff = 0.0;
+    max_diff = 1.0 - min_idt;
+
+    fprintf(stderr, "[consensus] In generate_consensus_from_mapping.\n");
+
+    seq_count = n_seq;
+
+    fflush(stdout);
+
+    tags_list = calloc( seq_count, sizeof(align_tags_t *) );
+
+    aligned_seq_count = 0;
+    for (j=1; j < seq_count; j++) {
+        arange = input_aranges[j];
+
+#define INDEL_ALLOWENCE_1 0.10
+
+#ifdef DEBUG_PRINT_CONS_STATUS
+        fprintf(stderr, "(external) 1: j = %d / %d, %ld %ld %ld %ld\n", j, seq_count, arange->s1, arange->e1, arange->s2, arange->e2);
+#endif
+
+        if (arange->e1 - arange->s1 < 100 || arange->e2 - arange->s2 < 100 ||
+            abs( (arange->e1 - arange->s1 ) - (arange->e2 - arange->s2) ) >
+                   (int) (0.5 * INDEL_ALLOWENCE_1 * (arange->e1 - arange->s1 + arange->e2 - arange->s2))) {
+            continue;
+        }
+
+#define INDEL_ALLOWENCE_2 150
+        aln = align(input_seq[j]+arange->s1, arange->e1 - arange->s1 ,
+                    input_seq[0]+arange->s2, arange->e2 - arange->s2 ,
+                    INDEL_ALLOWENCE_2, 1);
+
+#ifdef DEBUG_PRINT_CONS_STATUS
+        fprintf(stderr, "(external) 2: %lf\n", (((double) aln->dist / (double) aln->aln_str_size)));
+#endif
+
+#ifdef DEBUG_PRINT_ALN
+        fprintf(stderr, "T: %s\n", aln->t_aln_str);
+        fprintf(stderr, "Q: %s\n", aln->q_aln_str);
+#endif
+
+        // Find the first non-indel aligned base and offset the coordinates.
+        seq_coor_t q_start = arange->s1;
+        seq_coor_t t_start = arange->s2;
+        for (aln_clip_offset = 0; aln_clip_offset < aln->aln_str_size; ++aln_clip_offset) {
+            if (aln->t_aln_str[aln_clip_offset] != '-' && aln->q_aln_str[aln_clip_offset] != '-') {
+                break;
+            }
+            if (aln->q_aln_str[aln_clip_offset] != '-') {
+                ++q_start;
+            }
+            if (aln->t_aln_str[aln_clip_offset] != '-') {
+                ++t_start;
+            }
+        }
+
+#ifdef DEBUG_PRINT_CONS_STATUS
+        if (aln_clip_offset > 0) {
+            fprintf(stderr, "(external) 2.1: aln_clip_offset = %u, aln->aln_str_size = %d\n", aln_clip_offset, aln->aln_str_size);
+        }
+#endif
+
+        // if (aln->t_aln_str[] == '-' || aln->q_aln_str[0] == '-' || aln->t_aln_str[aln->aln_str_size-1] == '-' || aln->q_aln_str[aln->aln_str_size-1] == '-') {
+        //     fprintf(stderr, "(external) 2.1: Skipping adding of alignment because it has leading/trailing insertions.\n");
+        //     continue;
+        // }
+
+        if ((aln->aln_str_size - aln_clip_offset) > 500 && ((double) aln->dist / (double) (aln->aln_str_size - aln_clip_offset)) < max_diff) {
+            tags_list[aligned_seq_count] = get_align_tags( aln->q_aln_str + aln_clip_offset,
+                                                           aln->t_aln_str + aln_clip_offset,
+                                                           aln->aln_str_size - aln_clip_offset,
+                                                           q_start,
+                                                           t_start,
+                                                           j,
+                                                           0);
+            aligned_seq_count ++;
+#ifdef DEBUG_PRINT_CONS_STATUS
+            fprintf(stderr, "(external) 3: Passed filters and added tags.\n");
+#endif
+        }
+
+#ifdef DEBUG_PRINT_CONS_STATUS
+        fprintf(stderr, "(external) 4: aligned_seq_count = %d\n\n", aligned_seq_count);
+#endif
+
+        free_alignment(aln);
+    }
+
+#ifdef DEBUG_PRINT_CONS_STATUS
+    fprintf(stderr, "(external) 5: Finally, aligned_seq_count = %d\n\n", aligned_seq_count);
+#endif
+
+    if (aligned_seq_count > 0) {
+        consensus = get_cns_from_align_tags( tags_list, aligned_seq_count, strlen(input_seq[0]), min_cov );
+        if (!consensus) {
+            return 0;
+        }
+    } else {
+        // allocate an empty consensus sequence
+        consensus = calloc( 1, sizeof(consensus_data) );
+        consensus->sequence = calloc( 1, sizeof(char) );
+        consensus->eqv = calloc( 1, sizeof(unsigned int) );
+    }
+
     for (j=0; j < aligned_seq_count; j++) {
         free_align_tags(tags_list[j]);
     }
@@ -715,7 +912,10 @@ consensus_data * generate_utg_consensus( char ** input_seq,
     arange->s2 = 0;
     arange->e2 = strlen(input_seq[0]);
     tags_list[aligned_seq_count] = get_align_tags( input_seq[0], input_seq[0],
-                                                   strlen(input_seq[0]), arange, 0, 0);
+                                                   strlen(input_seq[0]),
+                                                   arange->s1,
+                                                   arange->s2,
+                                                   0, 0);
     aligned_seq_count += 1;
     for (j=1; j < seq_count; j++) {
         arange->s1 = 0;
@@ -761,7 +961,7 @@ consensus_data * generate_utg_consensus( char ** input_seq,
         }
         if (aln->aln_str_size > 500 && ((double) aln->dist / (double) aln->aln_str_size) < max_diff) {
             tags_list[aligned_seq_count] = get_align_tags( aln->q_aln_str, aln->t_aln_str,
-                                                           aln->aln_str_size, arange, j,
+                                                           aln->aln_str_size, arange->s1, arange->s2, j,
                                                            offset[j]);
             aligned_seq_count ++;
         }
