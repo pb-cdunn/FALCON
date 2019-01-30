@@ -56,6 +56,7 @@ import logging
 import os
 import re
 import sys
+import tarfile
 from ..util.io import yield_validated_fns
 from .. import io, functional
 from .. import(
@@ -242,10 +243,12 @@ def symlink(actual, symbolic=None, force=True):
     os.symlink(rel, symbolic)
 
 def symlink_db(db_fn, symlink=symlink):
-    """Symlink everything that could be related to this Dazzler DB.
+    """Symlink (into cwd) everything that could be related to this Dazzler DB.
     Exact matches will probably cause an exception in symlink().
     """
-    db_dirname, db_basename = os.path.split(db_fn)
+    db_dirname, db_basename = os.path.split(os.path.normpath(db_fn))
+    if not db_dirname:
+        return # must be here already
     dbname, suffix = os.path.splitext(db_basename)
 
     # Note: could be .db or .dam
@@ -686,9 +689,11 @@ def daligner_split(config, config_fn, db_fn, nproc, wildcards, length_cutoff_fn,
         scripts[i] = script
 
     jobs = list()
+    uow_dirs = list()
     for i, script in enumerate(scripts):
         job_id = 'j_{:04d}'.format(i)
         script_dir = os.path.join('.', 'daligner-scripts', job_id)
+        # Write for job-dict.
         script_fn = os.path.join(script_dir, 'run_daligner.sh')
         io.mkdirs(script_dir)
         with open(script_fn, 'w') as stream:
@@ -707,7 +712,35 @@ def daligner_split(config, config_fn, db_fn, nproc, wildcards, length_cutoff_fn,
         )
         job['wildcards'] = {wildcards: job_id}
         jobs.append(job)
+        # Write into a uow directory.
+        uow_dn = 'uow-{:04d}'.format(i)
+        io.mkdirs(uow_dn)
+        with io.cd(uow_dn):
+            script_fn = 'uow.sh'
+            with open(script_fn, 'w') as stream:
+                stream.write(script)
+            # Add symlinks.
+            symlink_db(os.path.join('..', base_db))
+        uow_dirs.append(uow_dn)
+
     io.serialize(split_fn, jobs)
+    # For Cromwell, we use a tar-file instead.
+    move_into_tar('all-units-of-work', uow_dirs)
+
+def move_into_tar(dn, fns):
+    # Create directory 'dn'.
+    # Move files (or dir-trees) into directory 'dn', and tar it.
+    # By convention, for tar-file "foo.tar", we first move everything into a directory named "foo".
+    io.mkdirs(dn)
+    for fn in fns:
+        cmd = 'mv {} {}'.format(fn, dn)
+        io.syscall(cmd)
+    tar_fn = '{}.tar'.format(dn)
+    #with tarfile.TarFile(tar_fn, 'w', dereference=False, ignore_zeros=True, errorlevel=2) as tf:
+    #    tf.add(dn)
+    cmd = 'tar cvf {} {}'.format(tar_fn, dn)
+    io.syscall(cmd)
+    io.rmdirs(dn)
 
 def daligner_apply(db_fn, script_fn, job_done_fn):
     symlink(script_fn)
@@ -1355,6 +1388,14 @@ def parse_args(argv):
             help=help_daligner_apply)
     add_daligner_apply_arguments(parser_daligner_apply)
     parser_daligner_apply.set_defaults(func=cmd_daligner_apply)
+
+    #parser_untar_daligner_apply = subparsers.add_parser('untar-daligner-apply',
+    #        formatter_class=HelpF,
+    #        description=help_untar_daligner_apply,
+    #        epilog='',
+    #        help=help_untar_daligner_apply)
+    #add_untar_daligner_apply_arguments(parser_untar_daligner_apply)
+    #parser_untar_daligner_apply.set_defaults(func=cmd_untar_daligner_apply)
 
     parser_daligner_combine = subparsers.add_parser('daligner-combine',
             formatter_class=HelpF,

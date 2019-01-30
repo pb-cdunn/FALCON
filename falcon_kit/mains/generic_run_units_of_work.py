@@ -38,6 +38,7 @@ def update_values_rel_to(things, dn):
 
 def run(bash_template_fn, units_of_work_fn, nproc,
         results_fn):
+    units_of_work_fn = os.path.realpath(units_of_work_fn)
     uows = io.deserialize(units_of_work_fn)
     uow_dirs = list()
     results = list()

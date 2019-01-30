@@ -10,7 +10,6 @@ import glob
 import logging
 import os
 import sys
-import pypeflow.do_task
 from .. import io
 
 LOG = logging.getLogger()
