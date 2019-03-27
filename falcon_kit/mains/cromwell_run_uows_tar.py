@@ -56,8 +56,8 @@ For tool=daligner, we merge .las files into a single .las
         '--uows-tar-fn',
         help='Input. Tarfile of directories of unit-of-work.')
     parser.add_argument(
-        '--tool', default='daligner',
-        help='daligner/...')
+        '--tool', default='daligner', choices=['daligner', 'datander'],
+        help='The tool for each unit of work. (Currently ignored.)')
 
     args = parser.parse_args(argv[1:])
     return args

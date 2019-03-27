@@ -52,6 +52,7 @@ from __future__ import absolute_import
 import argparse
 import collections
 import glob
+import itertools
 import logging
 import os
 import re
@@ -181,9 +182,10 @@ which HPC.daligner
 HPC.daligner -P. {daligner_opt} {masks} -H$CUTOFF -f{prefix} {db}
     """.format(**params)
 
-def script_HPC_TANmask(config, db, prefix):
+def script_HPC_TANmask(config, db, tracks, prefix):
     assert prefix and '/' not in prefix
     params = dict(config)
+    #masks = ' '.join('-m{}'.format(track) for track in tracks)
     params.update(locals())
     return """
 rm -f {prefix}.*
@@ -201,6 +203,7 @@ def script_HPC_REPmask(config, db, tracks, prefix, group_size, coverage_limit):
         coverage_limit = 10**9 # an arbitrary large number
     assert prefix and '/' not in prefix
     params = dict(config)
+    masks = ' '.join('-m{}'.format(track) for track in tracks)
     params.update(locals())
     return """
 rm -f {prefix}.*
@@ -209,7 +212,7 @@ rm -f .{db}.*.rep*.data
 echo "SMRT_PYTHON_PATH_PREPEND=$SMRT_PYTHON_PATH_PREPEND"
 echo "PATH=$PATH"
 which HPC.REPmask
-HPC.REPmask -P. -g{group_size} -c{coverage_limit} {REPmask_opt} -v -f{prefix} {db}
+HPC.REPmask -P. -g{group_size} -c{coverage_limit} {REPmask_opt} {masks} -v -f{prefix} {db}
     """.format(**params)
 
 def symlink(actual, symbolic=None, force=True):
@@ -242,10 +245,25 @@ def symlink(actual, symbolic=None, force=True):
                 return
     os.symlink(rel, symbolic)
 
+def find_db(db):
+    if db.endswith('.db') or db.endswith('.dam'):
+        if not os.path.exists(db):
+            raise Exception('DB "{}" does not exist.'.format(db))
+        return db
+    db_fn = db + '.db'
+    if os.path.exists(db_fn):
+        return db_fn
+    db_fn = db + '.dam'
+    if os.path.exists(db_fn):
+        return db_fn
+    raise Exception('Could not find DB "{}"'.format(db))
+
 def symlink_db(db_fn, symlink=symlink):
     """Symlink (into cwd) everything that could be related to this Dazzler DB.
     Exact matches will probably cause an exception in symlink().
     """
+    if not os.path.exists(db_fn):
+        db_fn = find_db(db_fn)
     db_dirname, db_basename = os.path.split(os.path.normpath(db_fn))
     if not db_dirname:
         return # must be here already
@@ -273,12 +291,19 @@ def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
         stream.write(pype_tasks.TASK_DB_TAN_APPLY_SCRIPT)
     # TANmask would put track-files in the DB-directory, not '.',
     # so we need to symlink everything first.
-    db = symlink_db(db_fn)
+    symlink_db(db_fn)
+    db = os.path.splitext(db_fn)[0]
+    dbname = os.path.basename(db)
+
+    tracks = get_tracks(db_fn)
+
+    # We assume the actual DB will be symlinked here.
+    base_db = os.path.basename(db)
 
     script = ''.join([
-        script_HPC_TANmask(config, db, prefix='tan-jobs'),
+        script_HPC_TANmask(config, base_db, tracks, prefix='tan-jobs'),
     ])
-    script_fn = 'split_db.sh'
+    script_fn = 'split.sh'
     with open(script_fn, 'w') as ofs:
         exe = bash.write_sub_script(ofs, script)
     io.syscall('bash -vex {}'.format(script_fn))
@@ -287,7 +312,7 @@ def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
     # We need to parse that one. (We ignore the others.)
     lines = open('tan-jobs.01.OVL').readlines()
 
-    re_block = re.compile(r'{}(\.\d+|)'.format(db))
+    re_block = re.compile(r'{}(\.\d+|)'.format(dbname))
 
     def get_blocks(line):
         """Return ['.1', '.2', ...]
@@ -302,7 +327,7 @@ def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
             continue
         blocks = get_blocks(line)
         assert blocks, 'No blocks found in {!r} from {!r}'.format(line, 'tan-jobs.01.OVL')
-        las_files = ' '.join('TAN.{db}{block}.las'.format(db=db, block=block) for block in blocks)
+        las_files = ' '.join('TAN.{db}{block}.las'.format(db=dbname, block=block) for block in blocks)
         # We assume the actual DB will be symlinked here.
         base_db = os.path.basename(db)
         script_lines = [
@@ -316,11 +341,12 @@ def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
             # However, if there are multiple blocks, it is still possible for a single line to have
             # only 1 block. So we look for a solitary block that is '', and we symlink the .las to pretend
             # that it was named properly in the first place.
-            script_lines.append('mv .{db}.tan.data .{db}.1.tan.data\n'.format(db=db))
-            script_lines.append('mv .{db}.tan.anno .{db}.1.tan.anno\n'.format(db=db))
+            script_lines.append('mv .{db}.tan.data .{db}.1.tan.data\n'.format(db=dbname))
+            script_lines.append('mv .{db}.tan.anno .{db}.1.tan.anno\n'.format(db=dbname))
         scripts.append(''.join(script_lines))
 
     jobs = list()
+    uow_dirs = list()
     for i, script in enumerate(scripts):
         job_id = 'tan_{:03d}'.format(i)
         script_dir = os.path.join('.', 'tan-scripts', job_id)
@@ -344,7 +370,20 @@ def tan_split(config, config_fn, db_fn, uows_fn, bash_template_fn):
                 tan0_id=job_id,
         )
         jobs.append(job)
+        # Write into a uow directory.
+        uow_dn = 'uow-{:04d}'.format(i)
+        io.mkdirs(uow_dn)
+        with io.cd(uow_dn):
+            script_fn = 'uow.sh'
+            with open(script_fn, 'w') as stream:
+                stream.write(script)
+            # Add symlinks.
+            symlink_db(os.path.join('..', base_db))
+        uow_dirs.append(uow_dn)
+
     io.serialize(uows_fn, jobs)
+    # For Cromwell, we use a tar-file instead.
+    move_into_tar('all-units-of-work', uow_dirs)
 
 def tan_apply(db_fn, script_fn, job_done_fn):
     # datander would put track-files in the DB-directory, not '.',
@@ -354,6 +393,28 @@ def tan_apply(db_fn, script_fn, job_done_fn):
     symlink(script_fn)
     io.syscall('bash -vex {}'.format(os.path.basename(script_fn)))
     io.touch(job_done_fn)
+
+def track_combine(db_fn, track, anno_fofn_fn, data_fofn_fn):
+    # track is typically 'tan' or 'repN'.
+    symlink_db(db_fn)
+    db = os.path.splitext(db_fn)[0]
+    dbname = os.path.basename(db)
+    def symlink_unprefixed(fn):
+        bn = os.path.basename(fn)
+        if bn.startswith('dot'):
+            bn = bn[3:]
+        return symlink(fn, bn)
+    # Inputs will be symlinked into CWD, sans our prefix (assumed to be "dot").
+    # Note: we cannot use "validated" yielders b/c these can be zero-size.
+    for (i, pair) in enumerate(itertools.izip_longest(
+            io.yield_abspath_from_fofn(anno_fofn_fn),
+            io.yield_abspath_from_fofn(data_fofn_fn))):
+        (anno_fn, data_fn) = pair
+        symlink_unprefixed(anno_fn)
+        symlink_unprefixed(data_fn)
+    cmd = 'Catrack -vdf {} {}'.format(dbname, track)
+    LOG.info(cmd)
+    io.syscall(cmd)
 
 def tan_combine(db_fn, gathered_fn, new_db_fn):
     new_db = os.path.splitext(new_db_fn)[0]
@@ -983,6 +1044,8 @@ def setup_logging(log_level):
 def cmd_build(args):
     ours = get_ours(args.config_fn, args.db_fn)
     build_db(ours, args.input_fofn_fn, args.db_fn, args.length_cutoff_fn)
+def cmd_track_combine(args):
+    track_combine(args.db_fn, args.track, args.anno_fofn_fn, args.data_fofn_fn)
 def cmd_tan_split(args):
     ours = get_ours(args.config_fn, args.db_fn)
     tan_split(ours, args.config_fn, args.db_fn, args.split_fn, args.bash_template_fn)
@@ -1092,6 +1155,19 @@ def add_build_arguments(parser):
     parser.add_argument(
         '--length-cutoff-fn', required=True,
         help='output. Simple file of a single integer, either calculated or specified by --user-length-cutoff.'
+    )
+def add_track_combine_arguments(parser):
+    parser.add_argument(
+        '--anno-fofn-fn', required=True,
+        help='input. FOFN for .anno track files, which are 1:1 with .data track files.',
+    )
+    parser.add_argument(
+        '--data-fofn-fn', required=True,
+        help='input. FOFN for .data track files, which are 1:1 with .anno track files.',
+    )
+    parser.add_argument(
+        '--track', required=True,
+        help='Name of the Dazzler DB track. (e.g. "tan" or "rep1")',
     )
 def add_tan_split_arguments(parser):
     parser.add_argument(
@@ -1294,6 +1370,7 @@ def parse_args(argv):
 
     help_build = 'build Dazzler DB for raw_reads; calculate length-cutoff for HGAP seed reads; split Dazzler DB into blocks; run DBdust to mask low-complexity regions'
 
+    help_track_combine = 'given .anno and .data fofns, symlink into CWD, then run Catrack on partial track-files, to produce a mask'
     help_tan_split = 'generate units-of-work for datander, via HPC.TANmask'
     help_tan_apply = 'run datander and TANmask as a unit-of-work (according to output of HPC.TANmask), and remove .las files'
     help_tan_combine = 'run Catrack on partial track-files, to produce a "tan" mask'
@@ -1316,6 +1393,14 @@ def parse_args(argv):
             help=help_build)
     add_build_arguments(parser_build)
     parser_build.set_defaults(func=cmd_build)
+
+    parser_track_combine = subparsers.add_parser('track-combine',
+            formatter_class=HelpF,
+            description=help_track_combine,
+            epilog='To use these as a mask, subsequent steps will need to add "-mTRACK".',
+            help=help_track_combine)
+    add_track_combine_arguments(parser_track_combine)
+    parser_track_combine.set_defaults(func=cmd_track_combine)
 
     parser_tan_split = subparsers.add_parser('tan-split',
             formatter_class=HelpF,
