@@ -9,8 +9,8 @@ from .io import NativeIO as StringIO
 from .io import FilePercenter
 import contextlib
 import gzip
+import hashlib
 import logging
-import md5
 import os
 import re
 import subprocess
@@ -74,7 +74,7 @@ class FastaRecord(object):
             assert self.DELIMITER not in sequence
             self._name = name
             self._sequence = sequence
-            self._md5 = md5.md5(self.sequence).hexdigest()
+            self._md5 = hashlib.md5(self.sequence).hexdigest()
             self._id, self._metadata = splitFastaHeader(name)
         except AssertionError:
             raise ValueError("Invalid FASTA record data")

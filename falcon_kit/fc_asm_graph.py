@@ -136,10 +136,10 @@ class AsmGraph(object):
                 s, v, t = svt.split("~")
                 type_, length, score, one_path = self.utg_data[(s, t, v)]
                 one_path = one_path.split("~")
-                sg.add_path(one_path)
+                nx.add_path(sg, one_path)
         else:
             one_path = path_or_edges.split("~")
-            sg.add_path(one_path)
+            nx.add_path(sg, one_path)
         return sg
 
     def get_sg_for_ctg(self, ctg_id):
@@ -153,13 +153,13 @@ class AsmGraph(object):
         for t, utg in utgs:
             if t == "simple":
                 one_path = utg.split("~")
-                sg.add_path(one_path)
+                nx.add_path(sg, one_path)
             elif t == "compound":
                 for svt in utg.split("|"):
                     s, v, t = svt.split("~")
                     type_, length, score, one_path = self.utg_data[(s, t, v)]
                     one_path = one_path.split("~")
-                    sg.add_path(one_path)
+                    nx.add_path(sg, one_path)
 
         return sg
 
