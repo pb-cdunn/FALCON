@@ -32,7 +32,7 @@ def splitFastaHeader(name):
     """
     Split a FASTA/FASTQ header into its id and metadata components
     """
-    nameParts = re.split('\s', name, maxsplit=1)
+    nameParts = re.split(r'\s', name, maxsplit=1)
     id_ = nameParts[0]
     if len(nameParts) > 1:
         metadata = nameParts[1].strip()
@@ -74,7 +74,7 @@ class FastaRecord(object):
             assert self.DELIMITER not in sequence
             self._name = name
             self._sequence = sequence
-            self._md5 = hashlib.md5(self.sequence).hexdigest()
+            self._md5 = hashlib.md5(self._sequence).hexdigest()
             self._id, self._metadata = splitFastaHeader(name)
         except AssertionError:
             raise ValueError("Invalid FASTA record data")
@@ -145,7 +145,7 @@ class FastaRecord(object):
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return (self.name == other.name and
-                    self.sequence == other.sequence)
+                    self._sequence == other._sequence)
         else:
             return False
 
@@ -158,7 +158,7 @@ class FastaRecord(object):
         standard conventions about sequence wrapping.
         """
         return (">%s\n" % self.name) + \
-            wrap(self.sequence, self.COLUMNS)
+            wrap(self._sequence, self.COLUMNS)
 
 
 # These are refactored from ReaderBase/FastaReader.
