@@ -197,9 +197,10 @@ def test_serialize():
     gfa_graph.add_path('000000F', ['node1', 'node2'], ['4M', '7M'], tags={}, labels={'label1': 'test'})
 
     result = mod.serialize_gfa(gfa_graph)
-    expected = '{"paths": {"000000F": {"labels": {"label1": "test"}, "nodes": ["node1", "node2"], "tags": {}, "name": "000000F", "cigars": ["4M", "7M"]}}, "nodes": {"node1": {"labels": {}, "seq": "ACTGAAA", "name": "node1", "len": 7, "tags": {}}, "node2": {"labels": {}, "seq": "AAACCCGGGT", "name": "node2", "len": 10, "tags": {}}}, "edges": {"(\'node1\', \'node2\')": {"labels": {}, "v_orient": "+", "tags": {}, "v_start": 4, "cigar": "*", "w_end": 3, "w_start": 0, "w_orient": "+", "name": "edge1", "v_end": 7, "w": "node2", "v": "node1"}}}'
+    expected = {"paths": {"000000F": {"labels": {"label1": "test"}, "nodes": ["node1", "node2"], "tags": {}, "name": "000000F", "cigars": ["4M", "7M"]}}, "nodes": {"node1": {"labels": {}, "seq": "ACTGAAA", "name": "node1", "len": 7, "tags": {}}, "node2": {"labels": {}, "seq": "AAACCCGGGT", "name": "node2", "len": 10, "tags": {}}}, "edges": {"(\'node1\', \'node2\')": {"labels": {}, "v_orient": "+", "tags": {}, "v_start": 4, "cigar": "*", "w_end": 3, "w_start": 0, "w_orient": "+", "name": "edge1", "v_end": 7, "w": "node2", "v": "node1"}}}
 
-    assert(result == expected)
+    import json
+    assert json.loads(result) == expected
 
 def test_deserialize():
     gfa_graph = mod.GFAGraph()

@@ -227,7 +227,7 @@ def serialize_gfa(gfa_graph):
     gfa_dict['nodes'] = gfa_graph.nodes
     gfa_dict['edges'] = gfa_graph.edges
     gfa_dict['paths'] = gfa_graph.paths
-    return json.dumps(gfa_dict)
+    return json.dumps(gfa_dict, separators=(', ', ': '), sort_keys=True)
 
 def deserialize_gfa(fp_in):
     gfa_dict = json.load(fp_in)
