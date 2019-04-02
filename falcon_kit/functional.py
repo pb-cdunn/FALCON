@@ -311,7 +311,7 @@ def parsed_readlengths_from_dbdump_output(output):
     """Given output text from the DBump command,
     yield all read-lengths.
     """
-    re_length = re.compile('^L\s+\d+\s+(\d+)\s+(\d+)$')
+    re_length = re.compile(r'^L\s+\d+\s+(\d+)\s+(\d+)$')
     for line in output.splitlines():
         mo = re_length.search(line)
         if mo:
@@ -330,8 +330,8 @@ def mapped_readlengths_from_dbdump_output(output):
     https://dazzlerblog.wordpress.com/command-guides/dazz_db-command-guide/
     """
     lengths = dict()
-    re_rid = re.compile('^R\s+(\d+)$')
-    re_length = re.compile('^L\s+(\d+)\s+(\d+)\s+(\d+)$')
+    re_rid = re.compile(r'^R\s+(\d+)$')
+    re_length = re.compile(r'^L\s+(\d+)\s+(\d+)\s+(\d+)$')
     for line in output.splitlines():
         mo = re_rid.search(line)
         if mo:

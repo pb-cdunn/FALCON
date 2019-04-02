@@ -13,7 +13,7 @@ from .dazzler import symlink_db
 LOG = logging.getLogger()
 
 def get_option_with_proper_nproc(regexp, opt, opt_name, nproc, cpu_count=multiprocessing.cpu_count()):
-    """Return opts sans the regexp match, and proper nproc.
+    r"""Return opts sans the regexp match, and proper nproc.
     >>> regexp = re.compile(r'-j[^\d]*(\d+)')
     >>> get_option_with_proper_nproc(regexp, 'foo -j 5', 'baz', nproc=7, cpu_count=6)
     ('foo ', 5)

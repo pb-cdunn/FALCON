@@ -1454,7 +1454,7 @@ def ovlp_to_graph(args):
     compound_path_file.close()
 
     # remove short utg using local flow consistent rule
-    """
+    r"""
       short UTG like this can be removed, this kind of utg are likely artifects of repeats
       >____           _____>
            \__UTG_>__/
