@@ -68,13 +68,11 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
     # Store config as JSON, available to many tasks.
     config_fn = './config.json' # must not be in a task-dir
     io.serialize(config_fn, config)
-    #with open('foo.snake', 'w') as snakemake_writer:
-    with open('/dev/null', 'w') as snakemake_writer:
-        rule_writer = snakemake.SnakemakeRuleWriter(snakemake_writer)
-        run(wf, config, rule_writer,
-            os.path.abspath(config_fn),
-            input_fofn_fn=input_fofn_fn,
-            )
+    rule_writer = None
+    run(wf, config, rule_writer,
+        os.path.abspath(config_fn),
+        input_fofn_fn=input_fofn_fn,
+        )
 
 
 def add_bam2dexta_tasks(

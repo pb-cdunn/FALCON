@@ -59,7 +59,8 @@ def wrap_gen_task(rule_writer, script, inputs, outputs, parameters=None, dist=No
     pt = pype_gen_task(script, inputs, outputs, params, dist)
 
     # Run pype_gen_task first because it can valid some stuff.
-    rule_writer(inputs, outputs, params, script)
+    if rule_writer:
+        rule_writer(inputs, outputs, params, script)
     return pt
 
 
@@ -89,7 +90,8 @@ def gen_parallel_tasks(
     assert not task_parameters, 'We do not currently support the "parameters" field of a run_dict. {!r}'.format(task_parameters)
 
     # Write 3 wildcard rules for snakemake, 2 with dynamic.
-    rule_writer.write_dynamic_rules(
+    if rule_writer:
+        rule_writer.write_dynamic_rules(
             rule_name="foo",
             input_json=split_fn,
             inputs=dict_rel_paths(run_dict['inputs']),
