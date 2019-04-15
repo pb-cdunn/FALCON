@@ -3,6 +3,7 @@
 import falcon_kit.FastaReader as FastaReader
 
 import os
+import re
 import sys
 import argparse
 import collections
@@ -14,6 +15,29 @@ import json
 LOG = logging.getLogger()
 
 ZMWTuple = collections.namedtuple('ZMWTuple', ['movie_name', 'zmw_id', 'subread_start', 'subread_end', 'seq_len', 'subread_record', 'subread_header', 'subread_id'])
+
+re_ccs = re.compile(r'^([^/]*/[^/]*)/ccs\b(.*)$')
+
+def str_name(name, seqlen):
+    """In lieu of FastaReader.__str__() to replace "/ccs".
+    >>> str_name('m/123/0_99 FOO=BAR', 7)
+    'm/123/0_99 FOO=BAR'
+    >>> str_name('m/123/ccs FOO=BAR', 7)
+    'm/123/0_7 FOO=BAR'
+    """
+    if 'ccs' not in name:
+        # Avoid regex when not needed.
+        return name
+    match = re_ccs.search(name)
+    if match:
+        b_e = '0_{}'.format(seqlen)
+        name = re_ccs.sub(r'\1/0_{}\2'.format(seqlen), name, count=1)
+    return name
+
+def write_record(fp, record):
+    fp.write('>{}\n'.format(str_name(record.name, record.length)))
+    fp.write(FastaReader.wrap(record.sequence, FastaReader.FastaRecord.COLUMNS))
+    fp.write('\n')
 
 def check_in_whitelist(whitelist_set, movie_name, zmw_id):
     """
@@ -144,8 +168,7 @@ def yield_zmwtuple(records, whitelist_set, store_record):
 def write_streamed(fp_out, yield_zmwtuple_func, zmw_filter_func):
     for zmw_id, zmw_subreads in itertools.groupby(yield_zmwtuple_func(store_record=True), lambda x: x.zmw_id):
         zrec = zmw_filter_func(list(zmw_subreads))
-        fp_out.write(str(zrec.subread_record))
-        fp_out.write('\n')
+        write_record(fp_out, zrec.subread_record)
 
 def run_streamed_median_filter(fp_in, fp_out, whitelist_set, zmw_filter_func=median_zmw_subread):
     def yield_zmwtuple_func(store_record=True):
@@ -167,8 +190,7 @@ def run_streamed_longest_filter(fp_in, fp_out, whitelist_set):
 ##############################
 def run_pass_filter(fp_in, fp_out, whitelist_set):
     for record in yield_record(whitelist_set, FastaReader.yield_fasta_record(fp_in, log=LOG.info)):
-        fp_out.write(str(record))
-        fp_out.write('\n')
+        write_record(fp_out, record)
 
 ##################################
 ### Double-pass median filter. ###
@@ -195,8 +217,7 @@ def write_doublepass_median(fp_out, yield_zmwtuple_func, zmw_filter_func=median_
         zmw_id = zrec.zmw_id
         subread_id = zrec.subread_id
         if selected[zmw_id] == subread_id:
-            fp_out.write(str(zrec.subread_record))
-            fp_out.write('\n')
+            write_record(fp_out, zrec.subread_record)
 
 def run_median_filter(fp_in, fp_out, whitelist_set, zmw_filter_func=median_zmw_subread):
     # Needed to jump back for the second pass.

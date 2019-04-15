@@ -156,6 +156,16 @@ ACGT
 ACG
 """
 
+# Test ccs input
+fasta_tests[8] = """\
+>synthetic/1/ccs
+GATTACA
+"""
+expected_tests[8] = """\
+>synthetic/1/0_7
+GATTACA
+"""
+
 # Specific for the internal-median command.
 fasta_tests[7] = """\
 >synthetic/1/0_3
@@ -423,6 +433,11 @@ def test_run_pass_filter(case):
 
 def test_run_pass_filter_5():
     check_run_raises(mod.run_pass_filter, fasta_tests[5])
+
+def test_run_pass_filter_8_ccs():
+    provided = fasta_tests[8]
+    expected = expected_tests[8]
+    check_run(mod.run_pass_filter, provided, expected)
 
 ########################################
 ### Test the streamed median filter. ###
