@@ -31,6 +31,9 @@ def wrap(s, columns):
 def splitFastaHeader(name):
     """
     Split a FASTA/FASTQ header into its id and metadata components
+
+    >>> splitFastaHeader('>m54329_180926_230856/34669168/0_42 FOO=BAR X=Y')
+    ('>m54329_180926_230856/34669168/0_42', 'FOO=BAR X=Y')
     """
     nameParts = re.split(r'\s', name, maxsplit=1)
     id_ = nameParts[0]
