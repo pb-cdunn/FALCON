@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-
 from builtins import next
 from builtins import range
 from builtins import object
@@ -15,6 +14,7 @@ import os
 import re
 import subprocess
 import sys
+import warnings
 
 LOG = logging.getLogger(__name__)
 
@@ -31,6 +31,9 @@ def wrap(s, columns):
 def splitFastaHeader(name):
     """
     Split a FASTA/FASTQ header into its id and metadata components
+
+    >>> splitFastaHeader('>m54329_180926_230856/34669168/0_42 FOO=BAR X=Y')
+    ('>m54329_180926_230856/34669168/0_42', 'FOO=BAR X=Y')
     """
     nameParts = re.split(r'\s', name, maxsplit=1)
     id_ = nameParts[0]
@@ -184,6 +187,7 @@ def yield_fasta_record(f, fn=None, log=LOG.info):
         raise Exception("Invalid FASTA file {!r}".format(fn))
 
 def yield_fasta_records(f, fn=None, log=LOG.info):
+    warnings.warn('use yield_fasta_record() instead', DeprecationWarning)
     return yield_fasta_record(f, fn, log)
 
 def stream_stdout(call, fn):

@@ -10,7 +10,7 @@ WHEELHOUSE?="/mnt/software/p/python/wheelhouse/develop/"
 
 MY_TEST_FLAGS?=-v -s --durations=0
 
-DOCTEST_MODULES= falcon_kit/functional.py falcon_kit/mains/consensus_task.py falcon_kit/mains/fasta_filter.py falcon_kit/mains/fasta_subsample.py
+DOCTEST_MODULES= falcon_kit/functional.py falcon_kit/mains/consensus_task.py falcon_kit/mains/fasta_filter.py falcon_kit/mains/fasta_subsample.py falcon_kit/FastaReader.py
 
 install-edit:
 	pip -v install --user  --no-index --find-links=${WHEELHOUSE} --edit .
@@ -21,7 +21,7 @@ pylint:
 test:
 	python -c 'import falcon_kit; print falcon_kit.falcon'
 	which py.test || pip install --user pytest
-	py.test ${MY_TEST_FLAGS} --junit-xml=test.xml --doctest-modules ${DOCTEST_MODULES} test/
+	py.test ${MY_TEST_FLAGS} -W 'error' --junit-xml=test.xml --doctest-modules ${DOCTEST_MODULES} test/
 autopep8:
 	autopep8 --max-line-length=120 -ir -j0 falcon_kit/ examples/ test/ setup.py
 
