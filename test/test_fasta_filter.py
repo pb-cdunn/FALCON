@@ -1,4 +1,5 @@
 import falcon_kit.mains.fasta_filter as mod
+import pytest
 from falcon_kit import FastaReader
 import functools
 import helpers
@@ -582,3 +583,10 @@ def test_whitelist_main_cmd_streamed_longest_from_stdin(tmpdir, capsys):
             test_whitelist_fn.write(json.dumps(list(test_whitelist)))
 
         check_main_from_stdin_with_whitelist('streamed-longest', test_fasta, test_expected, str(test_whitelist_fn), capsys)
+
+#######################
+### Unit-test functions
+def test_tokenize_header():
+    with pytest.raises(ValueError) as e:
+        mod.tokenize_header('bad_header')
+    assert 'bad_header' in str(e.value)

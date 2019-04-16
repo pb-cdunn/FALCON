@@ -32,10 +32,17 @@ def tokenize_header(seq_header):
     >>> tokenize_header('foo/123/0_100')
     ('foo', '123', 0, 100)
     """
-    rid = seq_header.split()[0]
-    movie_name, zmw_id, subread_pos = rid.split('/')
-    subread_start, subread_end = [int(val) for val in subread_pos.split('_')]
-    return movie_name, zmw_id, subread_start, subread_end
+    try:
+        rid = seq_header.split()[0]
+        movie_name, zmw_id, subread_pos = rid.split('/')
+        subread_start, subread_end = [int(val) for val in subread_pos.split('_')]
+        return movie_name, zmw_id, subread_start, subread_end
+    except Exception as exc:
+        #raise ValueError(msg) from exc from exc
+        LOG.exception("Trapped exception. Raising new one.")
+        msg = "Error tokenizing FASTA header:\n{!r}".format(seq_header)
+        #raise ValueError(msg) from exc # python3
+        raise ValueError(msg)
 
 def yield_record_and_tokenized_headers(whitelist_set, records):
     """For each record, yield (record, tokens)
