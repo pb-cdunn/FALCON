@@ -15,6 +15,8 @@ which g++
 gcc --version
 which python
 
+make -C src/test
+
 rm -rf LOCAL
 mkdir -p LOCAL
 export PYTHONUSERBASE=$(pwd)/LOCAL

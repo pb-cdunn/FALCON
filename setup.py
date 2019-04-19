@@ -38,6 +38,7 @@ setup(name='falcon_kit',
           Extension('ext_falcon', ['src/c/ext_falcon.c', 'src/c/DW_banded.c', 'src/c/kmer_lookup.c', 'src/c/falcon.c'],
                     extra_link_args=[],
                     extra_compile_args=['-fPIC', '-O3',
+                                        '-std=c99',
                                         '-fno-omit-frame-pointer'],
                     # '-fno-omit-frame-pointer' can help with gperftools.
                     # libraries=['profiler'],
