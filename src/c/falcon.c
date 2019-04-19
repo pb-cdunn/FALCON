@@ -208,7 +208,7 @@ void update_col( align_tag_col_t * col, seq_coor_t p_t_pos, uint8_t p_delta, cha
                 fprintf(stderr, "[update_col] Assert will fail! (col->size < (UINT16_MAX-1))? Values: %u >= %u\n", col->size, (UINT16_MAX-1));
             }
             // fflush(stderr);
-            assert( col->size < UINT16_MAX-1 );
+            assert(col->size < UINT16_MAX-1 );
             realloc_aln_col(col);
         }
         link = col->n_link;
@@ -365,13 +365,13 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
     unsigned int g_best_k = 0;
     seq_coor_t g_best_t_pos = 0;
     {
-        int k;
-        int best_k;
-        double score;
-        double best_score;
-        double g_best_score;
+        int k = 0;
+        int best_k = 0;
+        double score = 0.0;
+        double best_score = 0.0;
+        double g_best_score = 0.0;
 
-        align_tag_col_t * aln_col;
+        align_tag_col_t * aln_col = 0;
 
         g_best_score = -1;
 
@@ -394,9 +394,9 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
                         best_score = -1;
 
                         for (int link = 0; link < aln_col->n_link; link++) { // loop through differnt link to previous column
-                            int pi;
-                            int pj;
-                            int pk;
+                            int pi = 0;
+                            int pj = 0;
+                            int pk = 0;
                             pi = aln_col->p_t_pos[link];
                             pj = aln_col->p_delta[link];
                             switch (aln_col->p_q_base[link]) {
@@ -449,7 +449,7 @@ consensus_data * get_cns_from_align_tags( align_tags_t ** tag_seqs,
             // This can't actually happen, because there is a check right above.
             fprintf(stderr, "[get_cns_from_align_tags]  Assert will fail!\n");
         }
-        assert(g_best_score > 0);
+        assert(g_best_score >= 0);
     }
 
     #ifdef DEBUG_DETAILED_VERBOSE
