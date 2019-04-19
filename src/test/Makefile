@@ -8,6 +8,7 @@ falcon: ../c/DW_banded.c ../c/kmer_lookup.c ../c/falcon.c falcon_main.c  ../c/co
 test.out: falcon
 	cat test.in | ./falcon > test.out
 	diff test.out test.expected && echo test passed
+	rm -f test.out
 
 test.in: generate_test.py
 	python3 generate_test.py > test.in
@@ -15,4 +16,4 @@ test.in: generate_test.py
 all: test.out
 
 clean:
-	rm test.out falcon
+	rm -f test.out falcon

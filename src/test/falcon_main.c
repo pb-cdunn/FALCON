@@ -13,14 +13,14 @@ consensus_data * generate_consensus( char ** input_seq,
                            double min_idt);
 void free_consensus_data( consensus_data * consensus );
 
-void main() {
-    unsigned int j;
+int main() {
+    unsigned int j = 0;
     char small_buffer[1024];
     char big_buffer[65536];
-    char ** input_seq;
-    char ** seq_id;
-    int seq_count;
-    consensus_data * consensus;
+    char ** input_seq = 0;
+    char ** seq_id = 0;
+    int seq_count = 0;
+    consensus_data * consensus = 0;
 
     input_seq = calloc( 501, sizeof(char *));
     seq_id = calloc( 501, sizeof(char *));
@@ -70,4 +70,5 @@ void main() {
     };
     free(seq_id);
     free(input_seq);
+    return 0;
 }
