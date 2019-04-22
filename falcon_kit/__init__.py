@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 from .falcon_kit import *
-__version__ = '1.2.7' # should match setup.py
+__version__ = '1.3.0' # should match setup.py
 
 try:
     import sys, pkg_resources

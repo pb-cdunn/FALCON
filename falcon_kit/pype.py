@@ -28,7 +28,7 @@ python -m falcon_kit.mains.generic_unsplit --result-fn-list-fn={output.result_fn
 #"""
 
 
-def wrap_gen_task(rule_writer, script, inputs, outputs, parameters=None, dist=None):
+def wrap_gen_task(script, inputs, outputs, rule_writer=None, parameters=None, dist=None):
     if parameters is None:
         parameters = dict()
     if dist is None:
@@ -65,10 +65,11 @@ def wrap_gen_task(rule_writer, script, inputs, outputs, parameters=None, dist=No
 
 
 def gen_parallel_tasks(
-        wf, rule_writer,
+        wf,
         split_fn,
         gathered_fn,
         run_dict,
+        rule_writer=None,
         dist=None,
         run_script=TASK_GENERIC_RUN_UNITS_SCRIPT,
 ):

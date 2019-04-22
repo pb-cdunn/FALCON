@@ -68,15 +68,14 @@ def main1(prog_name, input_config_fn, logger_config_fn=None):
     # Store config as JSON, available to many tasks.
     config_fn = './config.json' # must not be in a task-dir
     io.serialize(config_fn, config)
-    rule_writer = None
-    run(wf, config, rule_writer,
+    run(wf, config,
         os.path.abspath(config_fn),
         input_fofn_fn=input_fofn_fn,
         )
 
 
 def add_bam2dexta_tasks(
-            wf, rule_writer,
+            wf,
             config,
             input_fofn_fn, rawread_dir):
         # run bam2dexta
@@ -96,13 +95,12 @@ def add_bam2dexta_tasks(
             parameters={
                 'wildcards': 'bam2dexta_id',
             },
-            rule_writer=rule_writer,
             dist=Dist(local=True),
         ))
 
         gathered_fn = os.path.join(rawread_dir, 'bam2dexta-gathered', 'gathered-dexta-files.json')
         gen_parallel_tasks(
-            wf, rule_writer,
+            wf,
             bam2dexta_uows_fn, gathered_fn,
             run_dict=dict(
                 bash_template_fn=bam2dexta_bash_template_fn,
@@ -129,14 +127,13 @@ def add_bam2dexta_tasks(
                 'fofn': input_fofn_fn,
             },
             parameters={},
-            rule_writer=rule_writer,
             dist=Dist(local=True),
         ))
 
         return input_fofn_fn
 
 
-def run(wf, config, rule_writer,
+def run(wf, config,
         config_fn,
         input_fofn_fn,
         ):
@@ -175,7 +172,7 @@ def run(wf, config, rule_writer,
         # Most common workflow: Start with rawreads.
 
         if input_fofn_fn.endswith('.xml'):
-            input_fofn_fn = add_bam2dexta_tasks(wf, rule_writer, config, input_fofn_fn, rawread_dir)
+            input_fofn_fn = add_bam2dexta_tasks(wf, config, input_fofn_fn, rawread_dir)
 
         # import sequences into daligner DB
         # calculate length_cutoff (if specified as -1)
@@ -196,7 +193,6 @@ def run(wf, config, rule_writer,
             },
             parameters=dict(
             ),
-            rule_writer=rule_writer,
             dist=Dist(NPROC=1, job_dict=config['job.step.dust']),
         ))
 
@@ -216,13 +212,12 @@ def run(wf, config, rule_writer,
                 'bash_template': tan_bash_template_fn,
             },
             parameters={},
-            rule_writer=rule_writer,
             dist=Dist(NPROC=1),
         ))
 
         gathered_fn = os.path.join(rawread_dir, 'tan-gathered', 'gathered-done-files.json')
         gen_parallel_tasks(
-            wf, rule_writer,
+            wf,
             tan_uows_fn, gathered_fn,
             run_dict=dict(
                 bash_template_fn=tan_bash_template_fn,
@@ -252,7 +247,6 @@ def run(wf, config, rule_writer,
                 'new_db': r_db_tan_fn,
             },
             parameters={},
-            rule_writer=rule_writer,
             dist=Dist(local=True),
         ))
 
@@ -264,19 +258,19 @@ def run(wf, config, rule_writer,
         letter = 'a'
         group_size, coverage_limit = codes[0]
         i_db_fn = r_db_tan_fn
-        o_db_fn = add_rep_tasks(wf, rule_writer, rawread_dir, config, general_config,
+        o_db_fn = add_rep_tasks(wf, rawread_dir, config, general_config,
                 general_config_fn, i_db_fn, length_cutoff_fn,
                 letter, group_size, coverage_limit)
         letter = 'b'
         group_size, coverage_limit = codes[1]
         i_db_fn = o_db_fn
-        o_db_fn = add_rep_tasks(wf, rule_writer, rawread_dir, config, general_config,
+        o_db_fn = add_rep_tasks(wf, rawread_dir, config, general_config,
                 general_config_fn, i_db_fn, length_cutoff_fn,
                 letter, group_size, coverage_limit)
         letter = 'c'
         group_size, coverage_limit = codes[2]
         i_db_fn = o_db_fn
-        o_db_fn = add_rep_tasks(wf, rule_writer, rawread_dir, config, general_config,
+        o_db_fn = add_rep_tasks(wf, rawread_dir, config, general_config,
                 general_config_fn, i_db_fn, length_cutoff_fn,
                 letter, group_size, coverage_limit)
         r_db_rep_fn = o_db_fn
@@ -286,7 +280,7 @@ def run(wf, config, rule_writer,
         las_fofn_fn = os.path.join(rawread_dir, 'las-merge-combine', 'las_fofn.json')
 
         add_daligner_and_merge_tasks(
-            wf, rule_writer,
+            wf,
             general_config, config['job.step.da'], config['job.step.la'],
             rawread_dir,
             general_config_fn, r_db_rep_fn,
@@ -324,13 +318,12 @@ def run(wf, config, rule_writer,
                 'bash_template': bash_template_fn,
             },
             parameters=params,
-            rule_writer=rule_writer,
             dist=Dist(local=True),
         ))
 
         gathered_fn = os.path.join(rawread_dir, 'cns-gather', 'gathered.json')
         gen_parallel_tasks(
-            wf, rule_writer,
+            wf,
             split_fn, gathered_fn,
             run_dict=dict(
                 bash_template_fn=bash_template_fn,
@@ -363,7 +356,6 @@ def run(wf, config, rule_writer,
                 'preads_fofn': preads_fofn_fn,
             },
             parameters=parameters, #{},
-            rule_writer=rule_writer,
             dist=Dist(local=True),
         ))
 
@@ -382,7 +374,6 @@ def run(wf, config, rule_writer,
             outputs={'pre_assembly_report': pre_assembly_report_fn,
             },
             parameters=params,
-            rule_writer=rule_writer,
             dist=Dist(local=True),
         ))
 
@@ -415,7 +406,6 @@ def run(wf, config, rule_writer,
         },
         parameters=dict(
         ),
-        rule_writer=rule_writer,
         dist=Dist(NPROC=1, job_dict=config['job.step.dust']),
     ))
 
@@ -424,7 +414,7 @@ def run(wf, config, rule_writer,
     las_fofn_fn = os.path.join(pread_dir, 'las-merge-combine', 'las_fofn.json')
 
     add_daligner_and_merge_tasks(
-        wf, rule_writer,
+        wf,
         general_config, config['job.step.pda'], config['job.step.pla'],
         pread_dir,
         general_config_fn, preads_db_fn, # no tan-mask for preads
@@ -450,7 +440,6 @@ def run(wf, config, rule_writer,
                  'preads4falcon': preads4falcon_fn,
                  },
         parameters={},
-        rule_writer=rule_writer,
         dist=Dist(NPROC=4, job_dict=config['job.step.asm']),
     ))
 
@@ -466,7 +455,6 @@ def run(wf, config, rule_writer,
                 },
         outputs={'falcon_asm_done': falcon_asm_done_fn},
         parameters=parameters,
-        rule_writer=rule_writer,
         dist=Dist(NPROC=4, job_dict=config['job.step.asm']),
     ))
     wf.refreshTargets()
@@ -477,7 +465,7 @@ def run(wf, config, rule_writer,
 
     #return falcon_asm_done
 def add_daligner_and_merge_tasks(
-        wf, rule_writer,
+        wf,
         general_config, daligner_job_config, merge_job_config,
         super_dir,
         general_config_fn, db_fn,
@@ -515,13 +503,12 @@ def add_daligner_and_merge_tasks(
             'bash_template': daligner_bash_template_fn
         },
         parameters=params,
-        rule_writer=rule_writer,
         dist=Dist(local=True, NPROC=4), # really, NPROC=1, but we need to know the max
     ))
 
     gathered_fn = os.path.join(super_dir, 'daligner-gathered', 'gathered-done-files.json')
     gen_parallel_tasks(
-        wf, rule_writer,
+        wf,
         daligner_all_units_fn, gathered_fn,
         run_dict=dict(
             bash_template_fn=daligner_bash_template_fn,
@@ -549,7 +536,6 @@ def add_daligner_and_merge_tasks(
             'las_paths': gathered_las_fn,
         },
         parameters={},
-        rule_writer=rule_writer,
         #dist=Dist(NPROC=1, MB=4000, job_dict=daligner_job_config)
         dist=Dist(local=True),
     ))
@@ -571,13 +557,12 @@ def add_daligner_and_merge_tasks(
             'bash_template': bash_template_fn,
         },
         parameters=params,
-        rule_writer=rule_writer,
         dist=Dist(local=True),
     ))
 
     gathered_fn = os.path.join(super_dir, 'las-merge-gathered', 'gathered.json')
     gen_parallel_tasks(
-        wf, rule_writer,
+        wf,
         las_merge_all_units_fn, gathered_fn,
         run_dict=dict(
             bash_template_fn=bash_template_fn,
@@ -604,13 +589,12 @@ def add_daligner_and_merge_tasks(
             'las_paths': las_fofn_fn,
         },
         parameters={},
-        rule_writer=rule_writer,
         dist=Dist(local=True),
     ))
 
 
 def add_rep_tasks(
-        wf, rule_writer,
+        wf,
         rawread_dir, config, general_config,
         general_config_fn, i_db_fn, length_cutoff_fn,
         letter, group_size, coverage_limit,
@@ -630,7 +614,7 @@ def add_rep_tasks(
             group_size=group_size, coverage_limit=coverage_limit,
         )
         add_daligner_and_merge_tasks(
-            wf, rule_writer,
+            wf,
             general_config, config['job.step.da'], config['job.step.la'],
             rep_dir,
             general_config_fn, i_db_fn,
@@ -668,14 +652,13 @@ def add_rep_tasks(
                 'coverage_limit': coverage_limit,
                 'wildcards': '{}_id'.format(name),
             },
-            rule_writer=rule_writer,
             dist=Dist(NPROC=1),
         ))
 
         # rep-apply
         gathered_fn = os.path.join(rep_dir, 'rep-gathered', 'gathered-done-files.json')
         gen_parallel_tasks(
-            wf, rule_writer,
+            wf,
             rep_uows_fn, gathered_fn,
             run_dict=dict(
                 bash_template_fn=rep_bash_template_fn,
@@ -706,7 +689,6 @@ def add_rep_tasks(
             parameters={
                 'group_size': group_size,
             },
-            rule_writer=rule_writer,
             dist=Dist(local=True),
         ))
 
